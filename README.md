@@ -25,7 +25,7 @@ descubrir y descargar canciones nuevas desde la propia app.
 ## Stack
 
 Kotlin · Jetpack Compose (Material 3) · Media3/ExoPlayer · Coil · NewPipeExtractor ·
-jaudiotagger · MusicBrainz · Picovoice Porcupine · minSdk 26.
+jaudiotagger · MusicBrainz · Vosk (wake word offline) · minSdk 26.
 
 ## Compilar
 
@@ -35,13 +35,9 @@ jaudiotagger · MusicBrainz · Picovoice Porcupine · minSdk 26.
 
 ### Asistente de voz (opcional)
 
-Para activar el "Hey Viby" necesitas una cuenta gratuita de
-[Picovoice](https://console.picovoice.ai):
-
-1. Copia tu **AccessKey** y pégala en la pantalla *Asistente* de la app.
-2. Crea la palabra clave **"Viby"** (English, Android), descarga el `.ppn`,
-   renómbralo a `Viby.ppn` y colócalo en `app/src/main/assets/`.
-3. Recompila y activa el interruptor.
+El "Hey Viby" usa **Vosk** (offline, sin cuenta ni keys). En la pantalla *Asistente*
+de la app, activa el interruptor: la primera vez descarga un modelo de voz en español
+(~40 MB) y pide permiso de micrófono. Luego di "Viby" y, tras el beep, tu orden.
 
 ## Licencia
 

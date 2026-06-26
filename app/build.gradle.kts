@@ -59,7 +59,7 @@ dependencies {
     implementation(libs.newpipeextractor)
     implementation(libs.okhttp)
     implementation(libs.jaudiotagger)
-    implementation(libs.porcupine)
+    implementation(libs.vosk)
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)

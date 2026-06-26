@@ -22,7 +22,6 @@ import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
-import ai.picovoice.porcupine.PorcupineManager
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.session.MediaController
@@ -32,16 +31,22 @@ import com.google.common.util.concurrent.MoreExecutors
 import com.sweetcode.viby.data.MusicRepository
 import com.sweetcode.viby.model.Song
 import com.sweetcode.viby.playback.PlaybackService
+import org.vosk.Model
+import org.vosk.Recognizer
+import org.vosk.android.SpeechService
 import java.util.Locale
 
-/** Asistente de voz "Viby": wake word (Porcupine) → comando (SpeechRecognizer) → acción + voz (TTS). */
+/** Asistente "Viby": wake word offline (Vosk) → comando (SpeechRecognizer) → acción + voz (TTS). */
 class AssistantService : Service() {
 
     private val mainHandler = Handler(Looper.getMainLooper())
     private lateinit var audioManager: AudioManager
     private lateinit var musicRepo: MusicRepository
 
-    private var porcupineManager: PorcupineManager? = null
+    private var voskModel: Model? = null
+    private var voskRecognizer: Recognizer? = null
+    private var voskService: SpeechService? = null
+
     private var speechRecognizer: SpeechRecognizer? = null
     private var tts: TextToSpeech? = null
     private var ttsReady = false
@@ -73,7 +78,7 @@ class AssistantService : Service() {
         initTts()
         initController()
         initSpeech()
-        initPorcupine()
+        initWakeWord()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int = START_STICKY
@@ -120,33 +125,57 @@ class AssistantService : Service() {
         }
     }
 
-    private fun initPorcupine() {
-        val key = AssistantController.accessKey(this)
-        if (key.isBlank()) {
-            AssistantController.updateStatus("Falta el access key de Picovoice")
-            stopSelf()
-            return
-        }
-        try {
-            porcupineManager = PorcupineManager.Builder()
-                .setAccessKey(key)
-                .setKeywordPath(KEYWORD_ASSET)
-                .setSensitivity(0.6f)
-                .build(applicationContext) { mainHandler.post { onWakeWord() } }
-            porcupineManager?.start()
-            AssistantController.updateStatus("Escuchando \"Viby\"…")
-        } catch (e: Exception) {
-            AssistantController.updateStatus("Error: ${e.message ?: "no se pudo iniciar"}")
-            stopSelf()
-        }
+    private fun initWakeWord() {
+        AssistantController.updateStatus("Preparando…")
+        Thread {
+            val modelPath = VoskModelManager.ensureModel(applicationContext) { status ->
+                AssistantController.updateStatus(status)
+            }
+            if (modelPath == null) {
+                AssistantController.updateStatus("No se pudo descargar el modelo de voz")
+                mainHandler.post { stopSelf() }
+                return@Thread
+            }
+            try {
+                val model = Model(modelPath)
+                val recognizer = Recognizer(model, SAMPLE_RATE, WAKE_GRAMMAR)
+                val service = SpeechService(recognizer, SAMPLE_RATE)
+                voskModel = model
+                voskRecognizer = recognizer
+                voskService = service
+                mainHandler.post {
+                    service.startListening(voskListener)
+                    AssistantController.updateStatus("Escuchando \"Viby\"…")
+                }
+            } catch (e: Exception) {
+                AssistantController.updateStatus("Error: ${e.message ?: "modelo inválido"}")
+                mainHandler.post { stopSelf() }
+            }
+        }.start()
     }
 
-    // ---- Flujo de escucha ----
+    // ---- Wake word (Vosk) ----
+
+    private val voskListener = object : org.vosk.android.RecognitionListener {
+        override fun onPartialResult(hypothesis: String?) { checkWake(hypothesis) }
+        override fun onResult(hypothesis: String?) { checkWake(hypothesis) }
+        override fun onFinalResult(hypothesis: String?) {}
+        override fun onError(exception: Exception?) {}
+        override fun onTimeout() {}
+    }
+
+    private fun checkWake(hypothesis: String?) {
+        if (listening || hypothesis == null) return
+        val text = hypothesis.lowercase()
+        if (text.contains("vivi") || text.contains("bibi") || text.contains("vivy")) {
+            onWakeWord()
+        }
+    }
 
     private fun onWakeWord() {
         if (listening) return
         listening = true
-        runCatching { porcupineManager?.stop() } // libera el micrófono para el reconocimiento
+        runCatching { voskService?.stop() } // libera el micrófono para el reconocimiento del comando
         AssistantController.updateStatus("Te escucho…")
         beep()
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
@@ -161,11 +190,7 @@ class AssistantService : Service() {
             val text = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
             if (text.isNullOrBlank()) speak("No te entendí") else handleText(text)
         }
-
-        override fun onError(error: Int) {
-            speak("No te escuché bien")
-        }
-
+        override fun onError(error: Int) { speak("No te escuché bien") }
         override fun onReadyForSpeech(params: Bundle?) {}
         override fun onBeginningOfSpeech() {}
         override fun onRmsChanged(rmsdB: Float) {}
@@ -177,7 +202,7 @@ class AssistantService : Service() {
 
     private fun resumeWakeWord() {
         listening = false
-        runCatching { porcupineManager?.start() }
+        runCatching { voskService?.startListening(voskListener) }
         AssistantController.updateStatus("Escuchando \"Viby\"…")
     }
 
@@ -207,8 +232,7 @@ class AssistantService : Service() {
         val md = controller?.currentMediaItem?.mediaMetadata
         val title = md?.title
         if (title != null) {
-            val artist = md.artist ?: "artista desconocido"
-            speak("Estás escuchando $title de $artist")
+            speak("Estás escuchando $title de ${md.artist ?: "artista desconocido"}")
         } else {
             speak("Ahora mismo no hay nada sonando")
         }
@@ -242,7 +266,7 @@ class AssistantService : Service() {
         if (ttsReady) {
             tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "viby")
         } else {
-            resumeWakeWord() // sin voz disponible, igual reanuda la escucha
+            resumeWakeWord()
         }
     }
 
@@ -280,8 +304,10 @@ class AssistantService : Service() {
     }
 
     override fun onDestroy() {
-        runCatching { porcupineManager?.stop() }
-        runCatching { porcupineManager?.delete() }
+        runCatching { voskService?.stop() }
+        runCatching { voskService?.shutdown() }
+        runCatching { voskRecognizer?.close() }
+        runCatching { voskModel?.close() }
         runCatching { speechRecognizer?.destroy() }
         runCatching { tts?.shutdown() }
         controllerFuture?.let { MediaController.releaseFuture(it) }
@@ -306,6 +332,7 @@ class AssistantService : Service() {
     companion object {
         private const val CHANNEL_ID = "viby_assistant"
         private const val NOTIF_ID = 3001
-        private const val KEYWORD_ASSET = "Viby.ppn"
+        private const val SAMPLE_RATE = 16000.0f
+        private const val WAKE_GRAMMAR = "[\"vivi\", \"bibi\", \"vivy\", \"oye vivi\", \"[unk]\"]"
     }
 }

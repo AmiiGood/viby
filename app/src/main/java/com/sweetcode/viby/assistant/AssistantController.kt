@@ -23,11 +23,6 @@ object AssistantController {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
     fun isEnabled(context: Context): Boolean = prefs(context).getBoolean(KEY_ENABLED, false)
-    fun accessKey(context: Context): String = prefs(context).getString(KEY_ACCESS, "").orEmpty()
-
-    fun setAccessKey(context: Context, key: String) {
-        prefs(context).edit().putString(KEY_ACCESS, key.trim()).apply()
-    }
 
     fun setEnabled(context: Context, enabled: Boolean) {
         prefs(context).edit().putBoolean(KEY_ENABLED, enabled).apply()
@@ -52,5 +47,4 @@ object AssistantController {
 
     private const val PREFS = "viby_assistant"
     private const val KEY_ENABLED = "enabled"
-    private const val KEY_ACCESS = "access_key"
 }

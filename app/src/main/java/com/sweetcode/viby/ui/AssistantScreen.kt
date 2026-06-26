@@ -19,7 +19,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -28,9 +27,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -44,7 +41,6 @@ import com.sweetcode.viby.assistant.AssistantController
 fun AssistantScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     val state by AssistantController.state.collectAsStateWithLifecycle()
-    var accessKey by remember { mutableStateOf(AssistantController.accessKey(context)) }
 
     LaunchedEffect(Unit) { AssistantController.syncFrom(context) }
 
@@ -59,7 +55,6 @@ fun AssistantScreen(onBack: () -> Unit) {
             AssistantController.setEnabled(context, false)
             return
         }
-        AssistantController.setAccessKey(context, accessKey)
         val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
             PackageManager.PERMISSION_GRANTED
         if (granted) AssistantController.setEnabled(context, true)
@@ -91,7 +86,7 @@ fun AssistantScreen(onBack: () -> Unit) {
         ) {
             Row(
                 Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 Column(Modifier.weight(1f)) {
                     Text(
@@ -108,21 +103,9 @@ fun AssistantScreen(onBack: () -> Unit) {
                 Switch(checked = state.enabled, onCheckedChange = { toggle(it) })
             }
 
-            OutlinedTextField(
-                value = accessKey,
-                onValueChange = {
-                    accessKey = it
-                    AssistantController.setAccessKey(context, it)
-                },
-                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                label = { Text("Picovoice Access Key") },
-                singleLine = true,
-            )
-
-            Spacer(Modifier.height(20.dp))
-
+            Spacer(Modifier.height(12.dp))
             Text(
-                "Cómo activarlo",
+                "Cómo funciona",
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onBackground,
@@ -152,13 +135,12 @@ fun AssistantScreen(onBack: () -> Unit) {
 }
 
 private const val INSTRUCTIONS =
-    "1. Crea una cuenta gratis en console.picovoice.ai y copia tu AccessKey en el campo de arriba.\n\n" +
-        "2. En Picovoice Console crea la palabra clave \"Viby\" (idioma English, plataforma Android), " +
-        "descarga el archivo .ppn, renómbralo a \"Viby.ppn\" y colócalo en la carpeta " +
-        "app/src/main/assets/ del proyecto (vuelve a compilar).\n\n" +
-        "3. Activa el interruptor y concede el permiso de micrófono.\n\n" +
-        "Nota: con el asistente encendido, el micrófono escucha en segundo plano (verás el indicador " +
-        "de micrófono de Android). Apágalo cuando no lo uses."
+    "Al activarlo la primera vez, Viby descarga un modelo de voz en español (~40 MB) y pide " +
+        "permiso de micrófono. Luego di \"Viby\" y, tras el beep, tu orden.\n\n" +
+        "Con el asistente encendido el micrófono escucha en segundo plano (verás el indicador " +
+        "de micrófono de Android) y gasta algo de batería. Apágalo cuando no lo uses.\n\n" +
+        "Si la voz de respuesta no se oye, instala una voz en español en los Ajustes del sistema " +
+        "(Texto a voz)."
 
 private const val COMMANDS =
     "Di \"Viby\" y luego:\n" +
