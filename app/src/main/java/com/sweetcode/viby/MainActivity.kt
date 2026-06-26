@@ -1,0 +1,140 @@
+package com.sweetcode.viby
+
+import android.Manifest
+import android.net.Uri
+import android.os.Build
+import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import com.sweetcode.viby.download.DownloadProgress
+import com.sweetcode.viby.ui.AssistantScreen
+import com.sweetcode.viby.ui.DetailScreen
+import com.sweetcode.viby.ui.DiscoverScreen
+import com.sweetcode.viby.ui.DownloadScreen
+import com.sweetcode.viby.ui.EqualizerScreen
+import com.sweetcode.viby.ui.HomeScreen
+import com.sweetcode.viby.ui.PlayerViewModel
+import com.sweetcode.viby.ui.QueueScreen
+import com.sweetcode.viby.ui.theme.VibyTheme
+
+class MainActivity : ComponentActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
+        setContent {
+            VibyTheme {
+                RequestNotificationPermission()
+                VibyApp()
+            }
+        }
+    }
+}
+
+@Composable
+private fun VibyApp() {
+    val vm: PlayerViewModel = viewModel()
+    val nav = rememberNavController()
+
+    // Refresca la biblioteca cuando termina una descarga (estés en la pantalla que estés).
+    val downloadsDone by DownloadProgress.completed.collectAsStateWithLifecycle()
+    LaunchedEffect(downloadsDone) {
+        if (downloadsDone > 0) vm.refreshLibrary()
+    }
+
+    NavHost(navController = nav, startDestination = "home") {
+        composable("home") {
+            HomeScreen(
+                vm = vm,
+                onOpenQueue = { nav.navigate("queue") },
+                onOpenEqualizer = { nav.navigate("equalizer") },
+                onOpenDownload = { nav.navigate("download") },
+                onOpenDiscover = { nav.navigate("discover") },
+                onOpenAssistant = { nav.navigate("assistant") },
+                onOpenAlbum = { name -> nav.navigate("album/${Uri.encode(name)}") },
+                onOpenArtist = { name -> nav.navigate("artist/${Uri.encode(name)}") },
+            )
+        }
+        composable("equalizer") {
+            EqualizerScreen(onBack = { nav.popBackStack() })
+        }
+        composable("download") {
+            DownloadScreen(onBack = { nav.popBackStack() })
+        }
+        composable("discover") {
+            val songs by vm.songs.collectAsStateWithLifecycle()
+            val favorites by vm.favorites.collectAsStateWithLifecycle()
+            DiscoverScreen(
+                songs = songs,
+                favorites = favorites,
+                onBack = { nav.popBackStack() },
+            )
+        }
+        composable("assistant") {
+            AssistantScreen(onBack = { nav.popBackStack() })
+        }
+        composable("queue") {
+            val queue by vm.queue.collectAsStateWithLifecycle()
+            val state by vm.uiState.collectAsStateWithLifecycle()
+            QueueScreen(
+                queue = queue,
+                currentIndex = state.currentIndex,
+                onBack = { nav.popBackStack() },
+                onPlayIndex = vm::playQueueIndex,
+                onRemoveIndex = vm::removeFromQueue,
+            )
+        }
+        composable("album/{name}") { entry ->
+            val name = Uri.decode(entry.arguments?.getString("name").orEmpty())
+            DetailContent(vm, name, onBack = { nav.popBackStack() }) { it.album == name }
+        }
+        composable("artist/{name}") { entry ->
+            val name = Uri.decode(entry.arguments?.getString("name").orEmpty())
+            DetailContent(vm, name, onBack = { nav.popBackStack() }) { it.artist == name }
+        }
+    }
+}
+
+@Composable
+private fun DetailContent(
+    vm: PlayerViewModel,
+    title: String,
+    onBack: () -> Unit,
+    filter: (com.sweetcode.viby.model.Song) -> Boolean,
+) {
+    val songs by vm.songs.collectAsStateWithLifecycle()
+    val state by vm.uiState.collectAsStateWithLifecycle()
+    val favorites by vm.favorites.collectAsStateWithLifecycle()
+    DetailScreen(
+        title = title,
+        songs = songs.filter(filter),
+        currentId = state.currentSong?.id,
+        favorites = favorites,
+        onBack = onBack,
+        onPlay = { list, index -> vm.play(list, index) },
+        onToggleFavorite = vm::toggleFavorite,
+    )
+}
+
+@Composable
+private fun RequestNotificationPermission() {
+    val launcher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { /* el usuario decide; la reproducción funciona igual */ }
+
+    LaunchedEffect(Unit) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            launcher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
+}
