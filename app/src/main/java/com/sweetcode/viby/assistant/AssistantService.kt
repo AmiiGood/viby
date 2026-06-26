@@ -8,8 +8,14 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
+import android.media.AudioFormat
 import android.media.AudioManager
+import android.media.AudioRecord
+import android.media.MediaRecorder
 import android.media.ToneGenerator
+import android.media.audiofx.AcousticEchoCanceler
+import android.media.audiofx.AutomaticGainControl
+import android.media.audiofx.NoiseSuppressor
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -31,9 +37,9 @@ import com.google.common.util.concurrent.MoreExecutors
 import com.sweetcode.viby.data.MusicRepository
 import com.sweetcode.viby.model.Song
 import com.sweetcode.viby.playback.PlaybackService
+import org.json.JSONObject
 import org.vosk.Model
 import org.vosk.Recognizer
-import org.vosk.android.SpeechService
 import java.util.Locale
 
 /** Asistente "Viby": wake word offline (Vosk) → comando (SpeechRecognizer) → acción + voz (TTS). */
@@ -45,7 +51,14 @@ class AssistantService : Service() {
 
     private var voskModel: Model? = null
     private var voskRecognizer: Recognizer? = null
-    private var voskService: SpeechService? = null
+
+    // Captura propia del micrófono (con cancelación de eco) para oír sobre la música.
+    private var audioRecord: AudioRecord? = null
+    private var captureThread: Thread? = null
+    @Volatile private var capturing = false
+    private var aec: AcousticEchoCanceler? = null
+    private var ns: NoiseSuppressor? = null
+    private var agc: AutomaticGainControl? = null
 
     private var speechRecognizer: SpeechRecognizer? = null
     private var tts: TextToSpeech? = null
@@ -137,14 +150,10 @@ class AssistantService : Service() {
                 return@Thread
             }
             try {
-                val model = Model(modelPath)
-                val recognizer = Recognizer(model, SAMPLE_RATE, WAKE_GRAMMAR)
-                val service = SpeechService(recognizer, SAMPLE_RATE)
-                voskModel = model
-                voskRecognizer = recognizer
-                voskService = service
+                voskModel = Model(modelPath)
+                voskRecognizer = Recognizer(voskModel, SAMPLE_RATE, WAKE_GRAMMAR)
                 mainHandler.post {
-                    service.startListening(voskListener)
+                    startWakeCapture()
                     AssistantController.updateStatus("Escuchando \"Viby\"…")
                 }
             } catch (e: Exception) {
@@ -154,28 +163,100 @@ class AssistantService : Service() {
         }.start()
     }
 
-    // ---- Wake word (Vosk) ----
+    // ---- Captura del micrófono con cancelación de eco ----
 
-    private val voskListener = object : org.vosk.android.RecognitionListener {
-        override fun onPartialResult(hypothesis: String?) { checkWake(hypothesis) }
-        override fun onResult(hypothesis: String?) { checkWake(hypothesis) }
-        override fun onFinalResult(hypothesis: String?) {}
-        override fun onError(exception: Exception?) {}
-        override fun onTimeout() {}
+    private fun startWakeCapture() {
+        if (capturing) return
+        val recognizer = voskRecognizer ?: return
+        runCatching { recognizer.reset() }
+
+        val minBuf = AudioRecord.getMinBufferSize(
+            SAMPLE_RATE_INT, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT,
+        ).coerceAtLeast(4096)
+
+        val record = try {
+            AudioRecord(
+                MediaRecorder.AudioSource.VOICE_COMMUNICATION, // habilita AEC referida a la reproducción
+                SAMPLE_RATE_INT,
+                AudioFormat.CHANNEL_IN_MONO,
+                AudioFormat.ENCODING_PCM_16BIT,
+                minBuf * 2,
+            )
+        } catch (e: Exception) {
+            AssistantController.updateStatus("No se pudo abrir el micrófono")
+            return
+        }
+        if (record.state != AudioRecord.STATE_INITIALIZED) {
+            record.release()
+            AssistantController.updateStatus("No se pudo abrir el micrófono")
+            return
+        }
+
+        val sessionId = record.audioSessionId
+        if (AcousticEchoCanceler.isAvailable()) {
+            aec = AcousticEchoCanceler.create(sessionId)?.apply { setEnabled(true) }
+        }
+        if (NoiseSuppressor.isAvailable()) {
+            ns = NoiseSuppressor.create(sessionId)?.apply { setEnabled(true) }
+        }
+        if (AutomaticGainControl.isAvailable()) {
+            agc = AutomaticGainControl.create(sessionId)?.apply { setEnabled(true) }
+        }
+
+        audioRecord = record
+        record.startRecording()
+        capturing = true
+        controller?.volume = LISTEN_VOLUME // baja un poco la música para oír mejor el wake word
+
+        captureThread = Thread {
+            val buffer = ShortArray(minBuf)
+            while (capturing) {
+                val n = record.read(buffer, 0, buffer.size)
+                if (n > 0) {
+                    // El texto reconocido debe ser EXACTAMENTE la palabra clave (no "contiene").
+                    val matched = if (recognizer.acceptWaveForm(buffer, n)) {
+                        wakeMatched(recognizer.result, "text")
+                    } else {
+                        wakeMatched(recognizer.partialResult, "partial")
+                    }
+                    if (matched) {
+                        mainHandler.post { if (!listening) onWakeWord() }
+                        break
+                    }
+                }
+            }
+        }.also { it.start() }
     }
 
-    private fun checkWake(hypothesis: String?) {
-        if (listening || hypothesis == null) return
-        val text = hypothesis.lowercase()
-        if (text.contains("vivi") || text.contains("bibi") || text.contains("vivy")) {
-            onWakeWord()
+    private fun stopWakeCapture() {
+        capturing = false
+        runCatching { captureThread?.join(500) }
+        captureThread = null
+        runCatching { audioRecord?.stop() }
+        runCatching { audioRecord?.release() }
+        audioRecord = null
+        runCatching { aec?.release() }; aec = null
+        runCatching { ns?.release() }; ns = null
+        runCatching { agc?.release() }; agc = null
+    }
+
+    /** Verdadero si el texto reconocido (campo [field]) es exactamente una palabra clave. */
+    private fun wakeMatched(json: String?, field: String): Boolean {
+        if (json == null) return false
+        return try {
+            JSONObject(json).optString(field).trim().lowercase() in WAKE_WORDS
+        } catch (e: Exception) {
+            false
         }
     }
+
+    // ---- Flujo de comando ----
 
     private fun onWakeWord() {
         if (listening) return
         listening = true
-        runCatching { voskService?.stop() } // libera el micrófono para el reconocimiento del comando
+        stopWakeCapture()                       // libera el micrófono
+        controller?.volume = COMMAND_VOLUME     // baja más la música mientras te escucha
         AssistantController.updateStatus("Te escucho…")
         beep()
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
@@ -202,7 +283,7 @@ class AssistantService : Service() {
 
     private fun resumeWakeWord() {
         listening = false
-        runCatching { voskService?.startListening(voskListener) }
+        startWakeCapture() // vuelve a poner la música al 70% (volumen de escucha)
         AssistantController.updateStatus("Escuchando \"Viby\"…")
     }
 
@@ -210,21 +291,21 @@ class AssistantService : Service() {
 
     private fun handleText(text: String) {
         when (val cmd = parseVoiceCommand(text)) {
-            VoiceCommand.Next -> { controller?.seekToNextMediaItem(); speak("Siguiente") }
-            VoiceCommand.Previous -> { controller?.seekToPreviousMediaItem(); speak("Anterior") }
-            VoiceCommand.Pause -> { controller?.pause(); speak("Pausado") }
-            VoiceCommand.Resume -> { controller?.play(); speak("Reproduciendo") }
+            VoiceCommand.Next -> { controller?.seekToNextMediaItem(); speak(VibyVoice.next()) }
+            VoiceCommand.Previous -> { controller?.seekToPreviousMediaItem(); speak(VibyVoice.previous()) }
+            VoiceCommand.Pause -> { controller?.pause(); speak(VibyVoice.pause()) }
+            VoiceCommand.Resume -> { controller?.play(); speak(VibyVoice.resume()) }
             VoiceCommand.WhatSong -> announceCurrentSong()
             VoiceCommand.VolumeUp -> {
                 audioManager.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_RAISE, AudioManager.FLAG_SHOW_UI)
-                speak("Subiendo volumen")
+                speak(VibyVoice.volumeUp())
             }
             VoiceCommand.VolumeDown -> {
                 audioManager.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_LOWER, AudioManager.FLAG_SHOW_UI)
-                speak("Bajando volumen")
+                speak(VibyVoice.volumeDown())
             }
             is VoiceCommand.Play -> playQuery(cmd.query)
-            VoiceCommand.Unknown -> speak("No entendí qué quieres")
+            VoiceCommand.Unknown -> speak(VibyVoice.unknown())
         }
     }
 
@@ -232,23 +313,23 @@ class AssistantService : Service() {
         val md = controller?.currentMediaItem?.mediaMetadata
         val title = md?.title
         if (title != null) {
-            speak("Estás escuchando $title de ${md.artist ?: "artista desconocido"}")
+            speak(VibyVoice.nowPlaying(title.toString(), (md.artist ?: "artista desconocido").toString()))
         } else {
-            speak("Ahora mismo no hay nada sonando")
+            speak(VibyVoice.nothing())
         }
     }
 
     private fun playQuery(query: String) {
         val songs = library
         if (songs.isEmpty()) {
-            speak("No tengo tu biblioteca cargada todavía")
+            speak(VibyVoice.noLibrary())
             return
         }
         val match = songs.firstOrNull { it.title.contains(query, true) }
             ?: songs.firstOrNull { "${it.artist} ${it.title}".contains(query, true) }
             ?: songs.firstOrNull { it.artist.contains(query, true) }
         if (match == null) {
-            speak("No encontré $query en tu biblioteca")
+            speak(VibyVoice.notFound(query))
             return
         }
         val index = songs.indexOf(match)
@@ -257,10 +338,10 @@ class AssistantService : Service() {
             prepare()
             play()
         }
-        speak("Reproduciendo ${match.title}")
+        speak(VibyVoice.playing(match.title))
     }
 
-    // ---- TTS / utilidades ----
+    // ---- Audio focus (duck) / TTS / utilidades ----
 
     private fun speak(text: String) {
         if (ttsReady) {
@@ -304,8 +385,8 @@ class AssistantService : Service() {
     }
 
     override fun onDestroy() {
-        runCatching { voskService?.stop() }
-        runCatching { voskService?.shutdown() }
+        runCatching { controller?.volume = 1f } // restaura el volumen al apagar el asistente
+        stopWakeCapture()
         runCatching { voskRecognizer?.close() }
         runCatching { voskModel?.close() }
         runCatching { speechRecognizer?.destroy() }
@@ -333,6 +414,10 @@ class AssistantService : Service() {
         private const val CHANNEL_ID = "viby_assistant"
         private const val NOTIF_ID = 3001
         private const val SAMPLE_RATE = 16000.0f
+        private const val SAMPLE_RATE_INT = 16000
+        private const val LISTEN_VOLUME = 0.7f  // música mientras escucha "Viby"
+        private const val COMMAND_VOLUME = 0.15f // música mientras dictas la orden
         private const val WAKE_GRAMMAR = "[\"vivi\", \"bibi\", \"vivy\", \"oye vivi\", \"[unk]\"]"
+        private val WAKE_WORDS = setOf("vivi", "bibi", "vivy", "vibi", "biby")
     }
 }
