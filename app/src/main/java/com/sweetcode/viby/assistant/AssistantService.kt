@@ -154,7 +154,7 @@ class AssistantService : Service() {
                 voskRecognizer = Recognizer(voskModel, SAMPLE_RATE, WAKE_GRAMMAR)
                 mainHandler.post {
                     startWakeCapture()
-                    AssistantController.updateStatus("Escuchando \"Viby\"…")
+                    AssistantController.updateStatus("Escuchando \"Oye Viby\"…")
                 }
             } catch (e: Exception) {
                 AssistantController.updateStatus("Error: ${e.message ?: "modelo inválido"}")
@@ -258,12 +258,15 @@ class AssistantService : Service() {
         stopWakeCapture()                       // libera el micrófono
         controller?.volume = COMMAND_VOLUME     // baja más la música mientras te escucha
         AssistantController.updateStatus("Te escucho…")
-        beep()
-        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
-            .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            .putExtra(RecognizerIntent.EXTRA_LANGUAGE, "es-MX")
-            .putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
-        runCatching { speechRecognizer?.startListening(intent) }
+        // Pausa breve para que el micro se libere; el beep suena cuando ya está listo (onReadyForSpeech).
+        mainHandler.postDelayed({
+            val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+                .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                .putExtra(RecognizerIntent.EXTRA_LANGUAGE, "es-MX")
+                .putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+                .putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false)
+            runCatching { speechRecognizer?.startListening(intent) }
+        }, 350)
     }
 
     private val recognitionListener = object : RecognitionListener {
@@ -272,7 +275,10 @@ class AssistantService : Service() {
             if (text.isNullOrBlank()) speak("No te entendí") else handleText(text)
         }
         override fun onError(error: Int) { speak("No te escuché bien") }
-        override fun onReadyForSpeech(params: Bundle?) {}
+        override fun onReadyForSpeech(params: Bundle?) {
+            // Ya está escuchando de verdad: ahora sí suena el beep como señal de "habla".
+            beep()
+        }
         override fun onBeginningOfSpeech() {}
         override fun onRmsChanged(rmsdB: Float) {}
         override fun onBufferReceived(buffer: ByteArray?) {}
@@ -284,7 +290,7 @@ class AssistantService : Service() {
     private fun resumeWakeWord() {
         listening = false
         startWakeCapture() // vuelve a poner la música al 70% (volumen de escucha)
-        AssistantController.updateStatus("Escuchando \"Viby\"…")
+        AssistantController.updateStatus("Escuchando \"Oye Viby\"…")
     }
 
     // ---- Ejecución de comandos ----
@@ -363,7 +369,7 @@ class AssistantService : Service() {
     private fun startForegroundCompat() {
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("Viby está escuchando")
-            .setContentText("Di \"Viby\" seguido de tu orden")
+            .setContentText("Di \"Oye Viby\" seguido de tu orden")
             .setSmallIcon(android.R.drawable.ic_btn_speak_now)
             .setOngoing(true)
             .build()
@@ -417,7 +423,8 @@ class AssistantService : Service() {
         private const val SAMPLE_RATE_INT = 16000
         private const val LISTEN_VOLUME = 0.7f  // música mientras escucha "Viby"
         private const val COMMAND_VOLUME = 0.15f // música mientras dictas la orden
-        private const val WAKE_GRAMMAR = "[\"vivi\", \"bibi\", \"vivy\", \"oye vivi\", \"[unk]\"]"
-        private val WAKE_WORDS = setOf("vivi", "bibi", "vivy", "vibi", "biby")
+        // Frase de dos palabras: más fácil de detectar y muchos menos falsos positivos.
+        private const val WAKE_GRAMMAR = "[\"oye vivi\", \"oye bibi\", \"oye vivy\", \"oye vibi\", \"[unk]\"]"
+        private val WAKE_WORDS = setOf("oye vivi", "oye bibi", "oye vivy", "oye vibi")
     }
 }

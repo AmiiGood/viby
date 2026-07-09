@@ -26,6 +26,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Album
@@ -72,7 +74,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -108,6 +112,8 @@ fun HomeScreen(
     val tab = Tab.entries[tabIndex]
     var searching by rememberSaveable { mutableStateOf(false) }
     var query by rememberSaveable { mutableStateOf("") }
+    // Referencia estable para que la lista no se recomponga con cada tick de progreso (0.5s).
+    val onToggleFavorite = remember { { id: String -> vm.toggleFavorite(id) } }
 
     val folderPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocumentTree()
@@ -262,9 +268,8 @@ fun HomeScreen(
                                         it.album.contains(query, true)
                                 }
                             }
-                            SongList(displayed, state.currentSong?.id, favorites,
-                                onPlay = { i -> vm.play(displayed, i) },
-                                onToggleFavorite = vm::toggleFavorite)
+                            val onPlay = remember(displayed) { fn@{ i: Int -> vm.play(displayed, i) } }
+                            SongList(displayed, state.currentSong?.id, favorites, onPlay, onToggleFavorite)
                         }
 
                         Tab.ALBUMS -> AlbumList(songs, onOpenAlbum)
@@ -276,9 +281,8 @@ fun HomeScreen(
                             if (favSongs.isEmpty()) {
                                 EmptyHint("Aún no tienes favoritos.\nToca el ❤ en una canción para agregarla.")
                             } else {
-                                SongList(favSongs, state.currentSong?.id, favorites,
-                                    onPlay = { i -> vm.play(favSongs, i) },
-                                    onToggleFavorite = vm::toggleFavorite)
+                                val onPlayFav = remember(favSongs) { fn@{ i: Int -> vm.play(favSongs, i) } }
+                                SongList(favSongs, state.currentSong?.id, favorites, onPlayFav, onToggleFavorite)
                             }
                         }
                     }
@@ -403,12 +407,15 @@ private fun ArtistList(songs: List<Song>, onOpenArtist: (String) -> Unit) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SearchField(query: String, onQueryChange: (String) -> Unit) {
+    val focusManager = LocalFocusManager.current
     TextField(
         value = query,
         onValueChange = onQueryChange,
         modifier = Modifier.fillMaxWidth(),
         placeholder = { Text("Buscar canción, artista o álbum…") },
         singleLine = true,
+        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+        keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() }),
         colors = TextFieldDefaults.colors(
             focusedContainerColor = MaterialTheme.colorScheme.surface,
             unfocusedContainerColor = MaterialTheme.colorScheme.surface,

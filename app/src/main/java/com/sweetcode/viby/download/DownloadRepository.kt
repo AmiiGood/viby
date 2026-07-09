@@ -136,7 +136,9 @@ class DownloadRepository(private val context: Context) {
             val candidates = info.audioStreams.filter { it.content != null }
             val audio = candidates.filter { it.format?.suffix == "m4a" }.maxByOrNull { it.averageBitrate }
                 ?: candidates.maxByOrNull { it.averageBitrate }
-                ?: return@withContext Result.failure(IllegalStateException("Sin audio disponible"))
+                ?: return@withContext Result.failure(
+                    IllegalStateException("Sin audio descargable (video restringido). Prueba otra versión.")
+                )
             val ext = audio.format?.suffix ?: "m4a"
 
             // Metadatos: heurística + MusicBrainz (nombres canónicos + álbum).

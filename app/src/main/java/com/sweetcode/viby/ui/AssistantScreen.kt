@@ -90,7 +90,7 @@ fun AssistantScreen(onBack: () -> Unit) {
             ) {
                 Column(Modifier.weight(1f)) {
                     Text(
-                        "Activar \"Hey Viby\"",
+                        "Activar \"Oye Viby\"",
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onBackground,
                     )
@@ -136,14 +136,14 @@ fun AssistantScreen(onBack: () -> Unit) {
 
 private const val INSTRUCTIONS =
     "Al activarlo la primera vez, Viby descarga un modelo de voz en español (~40 MB) y pide " +
-        "permiso de micrófono. Luego di \"Viby\" y, tras el beep, tu orden.\n\n" +
+        "permiso de micrófono. Luego di \"Oye Viby\" y, tras el beep, tu orden.\n\n" +
         "Con el asistente encendido el micrófono escucha en segundo plano (verás el indicador " +
         "de micrófono de Android) y gasta algo de batería. Apágalo cuando no lo uses.\n\n" +
         "Si la voz de respuesta no se oye, instala una voz en español en los Ajustes del sistema " +
         "(Texto a voz)."
 
 private const val COMMANDS =
-    "Di \"Viby\" y luego:\n" +
+    "Di \"Oye Viby\" y luego:\n" +
         "• \"siguiente\" / \"anterior\"\n" +
         "• \"pausa\" / \"reanuda\"\n" +
         "• \"reproduce [canción o artista]\"\n" +

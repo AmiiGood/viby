@@ -31,6 +31,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
@@ -46,6 +47,7 @@ fun DownloadScreen(onBack: () -> Unit) {
     val downloads by vm.downloads.collectAsStateWithLifecycle()
     val preview by vm.preview.collectAsStateWithLifecycle()
     var query by remember { mutableStateOf("") }
+    val focusManager = LocalFocusManager.current
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -74,7 +76,10 @@ fun DownloadScreen(onBack: () -> Unit) {
                 singleLine = true,
                 leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                keyboardActions = KeyboardActions(onSearch = { vm.search(query) }),
+                keyboardActions = KeyboardActions(onSearch = {
+                    vm.search(query)
+                    focusManager.clearFocus() // oculta el teclado
+                }),
                 colors = TextFieldDefaults.colors(
                     focusedContainerColor = MaterialTheme.colorScheme.surface,
                     unfocusedContainerColor = MaterialTheme.colorScheme.surface,

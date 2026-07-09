@@ -23,7 +23,11 @@ android {
 
     buildTypes {
         release {
+            // R8 desactivado: NewPipe/Vosk/jaudiotagger usan reflexión y se romperían al ofuscar.
+            // El salto de fluidez viene de que la release NO es debuggable.
             isMinifyEnabled = false
+            // Firma con la clave de depuración: instalable para uso personal (sideload).
+            signingConfig = signingConfigs.getByName("debug")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -60,6 +64,8 @@ dependencies {
     implementation(libs.okhttp)
     implementation(libs.jaudiotagger)
     implementation(libs.vosk)
+    implementation(libs.glance.appwidget)
+    implementation(libs.androidx.palette)
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)

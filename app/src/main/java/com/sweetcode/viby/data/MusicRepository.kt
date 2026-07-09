@@ -2,6 +2,8 @@ package com.sweetcode.viby.data
 
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import androidx.documentfile.provider.DocumentFile
@@ -138,11 +140,33 @@ class MusicRepository(private val context: Context) {
                 ?.takeIf { it.isNotBlank() } ?: "Álbum desconocido"
             val duration = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
                 ?.toLongOrNull() ?: 0L
+            saveThumbnailIfNeeded(uri.toString(), retriever)
             Song(uri.toString(), uri, title, artist, album, duration)
         } catch (e: Exception) {
             null
         } finally {
             runCatching { retriever.release() }
+        }
+    }
+
+    /** Extrae la carátula embebida una sola vez y la guarda como miniatura ≤256px en disco. */
+    private fun saveThumbnailIfNeeded(id: String, retriever: MediaMetadataRetriever) {
+        val file = coverThumbFile(context, id)
+        if (file.exists()) return
+        val bytes = retriever.embeddedPicture ?: return
+        runCatching {
+            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+            var sample = 1
+            val target = 256
+            while (bounds.outWidth / (sample * 2) >= target && bounds.outHeight / (sample * 2) >= target) {
+                sample *= 2
+            }
+            val opts = BitmapFactory.Options().apply { inSampleSize = sample }
+            val bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, opts) ?: return
+            coverThumbsDir(context).mkdirs()
+            file.outputStream().use { bmp.compress(Bitmap.CompressFormat.JPEG, 85, it) }
+            bmp.recycle()
         }
     }
 

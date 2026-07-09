@@ -82,8 +82,6 @@ fun DownloadResultRow(
                     status.message,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error,
-                    maxLines = 3,
-                    overflow = TextOverflow.Ellipsis,
                 )
             }
             if (status is DownloadStatus.AlreadyExists) {

@@ -1,6 +1,5 @@
 package com.sweetcode.viby.ui
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -54,8 +53,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.Player
 import com.sweetcode.viby.model.Song
+import coil.compose.AsyncImage
 import com.sweetcode.viby.ui.components.AlbumArt
-import com.sweetcode.viby.ui.components.rememberAlbumArt
+import com.sweetcode.viby.ui.components.AudioCover
 
 @Composable
 fun NowPlayingScreen(
@@ -73,22 +73,18 @@ fun NowPlayingScreen(
     onToggleShuffle: () -> Unit,
     onCycleRepeat: () -> Unit,
 ) {
-    val art = rememberAlbumArt(song.uri)
-
     Box(
         Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
         // Fondo desenfocado con la carátula
-        if (art != null) {
-            Image(
-                bitmap = art,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize().blur(60.dp),
-            )
-        }
+        AsyncImage(
+            model = AudioCover(song.uri),
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize().blur(60.dp),
+        )
         // Velo oscuro para legibilidad
         Box(
             Modifier.fillMaxSize().background(
