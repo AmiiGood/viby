@@ -1,9 +1,13 @@
 package com.sweetcode.viby
 
 import android.Manifest
+import android.content.Context
+import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.PowerManager
+import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -12,6 +16,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
@@ -35,6 +40,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             VibyTheme {
                 RequestNotificationPermission()
+                RequestBatteryExemption()
                 VibyApp()
             }
         }
@@ -135,6 +141,30 @@ private fun RequestNotificationPermission() {
     LaunchedEffect(Unit) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             launcher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
+}
+
+/**
+ * Pide la exención de optimización de batería (diálogo oficial de Android).
+ * Sin esto, Nothing OS restringe la app tras un rato inactiva y le quita la
+ * notificación/controles del reproductor aunque el audio siga sonando.
+ */
+@Composable
+private fun RequestBatteryExemption() {
+    val context = LocalContext.current
+    val launcher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { /* el sistema aplica el cambio; no necesitamos el resultado */ }
+
+    LaunchedEffect(Unit) {
+        val pm = context.getSystemService(Context.POWER_SERVICE) as PowerManager
+        if (!pm.isIgnoringBatteryOptimizations(context.packageName)) {
+            val intent = Intent(
+                Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                Uri.parse("package:${context.packageName}"),
+            )
+            runCatching { launcher.launch(intent) }
         }
     }
 }
