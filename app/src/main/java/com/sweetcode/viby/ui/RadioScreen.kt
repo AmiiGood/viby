@@ -64,6 +64,8 @@ fun RadioScreen(onBack: () -> Unit) {
 
     var enabled by remember { mutableStateOf(settings.enabled) }
     var apiKey by remember { mutableStateOf(settings.apiKey) }
+    var elevenKey by remember { mutableStateOf(settings.elevenApiKey) }
+    var elevenVoice by remember { mutableStateOf(settings.elevenVoiceId) }
     var everyN by remember { mutableStateOf(settings.everyNSongs) }
     var wifiOnly by remember { mutableStateOf(settings.wifiOnly) }
     var topics by remember { mutableStateOf(settings.topics) }
@@ -71,6 +73,8 @@ fun RadioScreen(onBack: () -> Unit) {
     fun persist() {
         settings.enabled = enabled
         settings.apiKey = apiKey
+        settings.elevenApiKey = elevenKey
+        settings.elevenVoiceId = elevenVoice
         settings.everyNSongs = everyN
         settings.wifiOnly = wifiOnly
         settings.topics = topics
@@ -125,7 +129,7 @@ fun RadioScreen(onBack: () -> Unit) {
                 Text("API key de Anthropic", fontWeight = FontWeight.SemiBold)
                 OutlinedTextField(
                     value = apiKey,
-                    onValueChange = { apiKey = it },
+                    onValueChange = { apiKey = it; persist() },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                     placeholder = { Text("sk-ant-...") },
@@ -135,6 +139,36 @@ fun RadioScreen(onBack: () -> Unit) {
                 )
                 Text(
                     "Se guarda solo en tu teléfono. Consíguela en console.anthropic.com.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
+            // Voz del DJ (ElevenLabs)
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("Voz del DJ (ElevenLabs)", fontWeight = FontWeight.SemiBold)
+                OutlinedTextField(
+                    value = elevenKey,
+                    onValueChange = { elevenKey = it; persist() },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    placeholder = { Text("xi-api-key...") },
+                    visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { keyboard?.hide(); persist() }),
+                )
+                OutlinedTextField(
+                    value = elevenVoice,
+                    onValueChange = { elevenVoice = it; persist() },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    placeholder = { Text("Voice ID (opcional)") },
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { keyboard?.hide(); persist() }),
+                )
+                Text(
+                    "Con key, el DJ usa voz neuronal (mucho más natural); sin key, usa la voz " +
+                        "de Android. Cada frase se sintetiza una vez y se guarda para oírse offline.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

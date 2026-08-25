@@ -11,8 +11,9 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import com.sweetcode.viby.MainActivity
-import com.sweetcode.viby.assistant.VibyVoice
 import com.sweetcode.viby.data.coverThumbFile
+import com.sweetcode.viby.radio.DjBanter
+import com.sweetcode.viby.radio.ElevenTts
 import com.sweetcode.viby.radio.RadioRepository
 import com.sweetcode.viby.radio.RadioSettings
 import com.sweetcode.viby.radio.VibyTts
@@ -39,9 +40,11 @@ class PlaybackService : MediaSessionService() {
     // Viby FM: DJ que habla noticias entre canciones.
     private val radioSettings by lazy { RadioSettings(applicationContext) }
     private val radioRepo by lazy { RadioRepository(applicationContext) }
+    private val eleven by lazy { ElevenTts() }
     private var exo: ExoPlayer? = null
     private var tts: VibyTts? = null
     private var songsSinceDj = 0
+    private var djBreaks = 0
     private var djSpeaking = false
 
     override fun onCreate() {
@@ -82,7 +85,10 @@ class PlaybackService : MediaSessionService() {
         override fun onPlaybackStateChanged(playbackState: Int) = refreshWidget()
     }
 
-    /** Cada N canciones (fin natural o salto), el DJ baja la música y da una noticia. */
+    /**
+     * Cada N canciones (fin natural o salto), el DJ baja la música y habla:
+     * SIEMPRE presenta la canción que entra con chispa, y a veces mete una noticia.
+     */
     private fun maybePlayDj(reason: Int) {
         // Cuenta tanto cuando la canción termina sola como cuando el usuario salta.
         val counts = reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO ||
@@ -95,25 +101,95 @@ class PlaybackService : MediaSessionService() {
         songsSinceDj++
         if (songsSinceDj < radioSettings.everyNSongs) return
         songsSinceDj = 0
-        scope.launch {
-            val segment = withContext(Dispatchers.IO) { radioRepo.nextSegment() } ?: return@launch
-            playDj(segment.script)
-        }
+        djBreaks++
+        val includeNews = djBreaks % 2 == 0
+        val md = player.currentMediaItem?.mediaMetadata
+        val title = md?.title?.toString().orEmpty()
+        val artist = md?.artist?.toString().orEmpty()
+        scope.launch { runDjBreak(title, artist, includeNews) }
     }
 
-    private fun playDj(script: String) {
+    /** Baja la música, habla (ElevenLabs si hay key; si no, voz de Android) y restaura. */
+    private suspend fun runDjBreak(title: String, artist: String, includeNews: Boolean) {
         val e = exo ?: return
+        if (djSpeaking) return
         djSpeaking = true
         val prevVolume = e.volume
         e.volume = 0.12f // ducking: baja la música mientras habla
-        if (tts == null) tts = VibyTts(applicationContext)
-        val text = "$script ${VibyVoice.resume()}"
-        tts?.speak(text) {
-            scope.launch {
-                e.volume = prevVolume
-                djSpeaking = false
+        try {
+            val handled = playPremium(title, artist, includeNews)
+            if (!handled) {
+                if (tts == null) tts = VibyTts(applicationContext)
+                tts?.speakAwait(buildAndroidText(title, artist, includeNews))
+            }
+        } finally {
+            e.volume = prevVolume
+            djSpeaking = false
+        }
+    }
+
+    /** Voz neuronal ElevenLabs: sintetiza (y cachea) los clips y los reproduce. */
+    private suspend fun playPremium(title: String, artist: String, includeNews: Boolean): Boolean {
+        val key = radioSettings.elevenApiKey
+        if (key.isBlank()) return false
+        val voice = radioSettings.elevenVoiceIdOrDefault()
+        val fallbackVoice = radioSettings.defaultElevenVoiceId()
+        val clips = withContext(Dispatchers.IO) {
+            // Intenta la voz elegida; si falla (p. ej. voz de paga), usa la de por defecto.
+            fun synth(text: String): java.io.File? =
+                eleven.synthToCache(applicationContext, key, voice, text)
+                    ?: if (voice != fallbackVoice)
+                        eleven.synthToCache(applicationContext, key, fallbackVoice, text)
+                    else null
+
+            val out = mutableListOf<java.io.File>()
+            if (includeNews && radioRepo.hasSegments()) {
+                radioRepo.nextSegment()?.let { seg -> synth(seg.script)?.let { out += it } }
+            }
+            val introText = DjBanter.songIntroFor(title, artist, (title + "|" + artist).hashCode())
+            synth(introText)?.let { out += it }
+            out
+        }
+        if (clips.isEmpty()) return false
+        clips.forEach { playAudioFile(it) }
+        return true
+    }
+
+    private suspend fun playAudioFile(file: java.io.File) =
+        kotlinx.coroutines.suspendCancellableCoroutine<Unit> { cont ->
+            val mp = android.media.MediaPlayer()
+            runCatching {
+                mp.setAudioAttributes(
+                    android.media.AudioAttributes.Builder()
+                        .setUsage(android.media.AudioAttributes.USAGE_MEDIA)
+                        .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SPEECH)
+                        .build()
+                )
+                mp.setDataSource(file.absolutePath)
+                mp.setOnCompletionListener { p -> runCatching { p.release() }; if (cont.isActive) cont.resumeWith(Result.success(Unit)) }
+                mp.setOnErrorListener { p, _, _ -> runCatching { p.release() }; if (cont.isActive) cont.resumeWith(Result.success(Unit)); true }
+                mp.setOnPreparedListener { p -> p.start() }
+                mp.prepareAsync()
+            }.onFailure {
+                runCatching { mp.release() }
+                if (cont.isActive) cont.resumeWith(Result.success(Unit))
+            }
+            cont.invokeOnCancellation { runCatching { mp.release() } }
+        }
+
+    /** Parlamento para la voz de Android: estación (a veces) + noticia (a veces) + canción. */
+    private fun buildAndroidText(title: String, artist: String, includeNews: Boolean): String {
+        val sb = StringBuilder()
+        if (djBreaks % 3 == 1) sb.append(DjBanter.stationId()).append(" ")
+        if (includeNews && radioRepo.hasSegments()) {
+            radioRepo.nextSegment()?.let { seg ->
+                sb.append(DjBanter.newsIntro()).append(" ")
+                    .append(seg.script).append(" ")
+                    .append(DjBanter.afterNews()).append(" ")
             }
         }
+        sb.append(DjBanter.songIntro(title, artist))
+        return sb.toString().trim()
     }
 
     private var updateJob: Job? = null

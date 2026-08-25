@@ -28,6 +28,21 @@ class RadioSettings(context: Context) {
         get() = prefs.getString(KEY_API, "").orEmpty()
         set(v) = prefs.edit().putString(KEY_API, v.trim()).apply()
 
+    /** API key de ElevenLabs (voz neuronal del DJ). Vacío = usa la voz de Android. */
+    var elevenApiKey: String
+        get() = prefs.getString(KEY_ELEVEN, "").orEmpty()
+        set(v) = prefs.edit().putString(KEY_ELEVEN, v.trim()).apply()
+
+    var elevenVoiceId: String
+        get() = prefs.getString(KEY_ELEVEN_VOICE, "").orEmpty()
+        set(v) = prefs.edit().putString(KEY_ELEVEN_VOICE, v.trim()).apply()
+
+    fun elevenVoiceIdOrDefault(): String = elevenVoiceId.ifBlank { DEFAULT_ELEVEN_VOICE }
+
+    fun defaultElevenVoiceId(): String = DEFAULT_ELEVEN_VOICE
+
+    fun hasElevenKey(): Boolean = elevenApiKey.isNotBlank()
+
     /** IDs de temas activos (NewsTopic.id). */
     var topics: Set<String>
         get() = prefs.getStringSet(KEY_TOPICS, DEFAULT_TOPICS) ?: DEFAULT_TOPICS
@@ -46,8 +61,12 @@ class RadioSettings(context: Context) {
         private const val KEY_EVERY_N = "every_n"
         private const val KEY_WIFI_ONLY = "wifi_only"
         private const val KEY_API = "api_key"
+        private const val KEY_ELEVEN = "eleven_key"
+        private const val KEY_ELEVEN_VOICE = "eleven_voice"
         private const val KEY_TOPICS = "topics"
         private const val KEY_LAST_FETCH = "last_fetch"
         private val DEFAULT_TOPICS = setOf(NewsTopic.TECNOLOGIA.id, NewsTopic.MUNDO.id)
+        // Voz multilingüe por defecto de ElevenLabs (Antoni); el usuario puede cambiarla.
+        private const val DEFAULT_ELEVEN_VOICE = "ErXwobaYiN019PkySvjV"
     }
 }
