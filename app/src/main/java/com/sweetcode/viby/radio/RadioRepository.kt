@@ -99,6 +99,7 @@ class RadioRepository(
     }
 
     companion object {
-        private const val MAX_PER_TOPIC = 2
+        // Más noticias por tema = arsenal diario más grande (menos repetición).
+        private const val MAX_PER_TOPIC = 6
     }
 }

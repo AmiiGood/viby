@@ -40,7 +40,7 @@ class ClaudeScriptWriter(
 
         val body = JSONObject().apply {
             put("model", MODEL)
-            put("max_tokens", 2000)
+            put("max_tokens", 4096) // suficiente para el arsenal grande de guiones
             put("system", SYSTEM)
             put("messages", JSONArray().put(JSONObject().apply {
                 put("role", "user")
