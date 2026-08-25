@@ -37,11 +37,11 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FolderOpen
 import androidx.compose.material.icons.rounded.LibraryMusic
-import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Radio
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.material3.Button
@@ -100,7 +100,7 @@ fun HomeScreen(
     onOpenEqualizer: () -> Unit,
     onOpenDownload: () -> Unit,
     onOpenDiscover: () -> Unit,
-    onOpenAssistant: () -> Unit,
+    onOpenRadio: () -> Unit,
     onOpenAlbum: (String) -> Unit,
     onOpenArtist: (String) -> Unit,
 ) {
@@ -194,8 +194,8 @@ fun HomeScreen(
                             }
                         }
                         if (!searching) {
-                            IconButton(onClick = onOpenAssistant) {
-                                Icon(Icons.Rounded.Mic, contentDescription = "Asistente Viby")
+                            IconButton(onClick = onOpenRadio) {
+                                Icon(Icons.Rounded.Radio, contentDescription = "Viby FM")
                             }
                             IconButton(onClick = onOpenDiscover) {
                                 Icon(Icons.Rounded.AutoAwesome, contentDescription = "Descubrir")
