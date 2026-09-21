@@ -27,8 +27,8 @@ android {
         applicationId = "com.sweetcode.viby"
         minSdk = 26
         targetSdk = 36
-        versionCode = 3
-        versionName = "1.2"
+        versionCode = 4
+        versionName = "1.3"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -70,6 +70,14 @@ android {
         }
     }
     compileOptions {
+        // NewPipeExtractor llama a URLEncoder.encode(String, Charset), que solo
+        // existe desde Android 13: en Android 12 o anterior la busqueda de
+        // descargas reventaba con NoSuchMethodError.
+        //
+        // Tiene que ser la variante _nio del desugaring, no la normal: comprobado
+        // con dexdump, la normal deja la llamada intacta y solo la _nio la
+        // reescribe a Lj$/net/URLEncoder, que se empaqueta dentro del APK.
+        isCoreLibraryDesugaringEnabled = true
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
@@ -100,6 +108,7 @@ dependencies {
     implementation(libs.jaudiotagger)
     implementation(libs.glance.appwidget)
     implementation(libs.androidx.palette)
+    coreLibraryDesugaring(libs.desugar.jdk.libs)
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
