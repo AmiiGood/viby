@@ -41,6 +41,29 @@ NewPipeExtractor · jaudiotagger · MusicBrainz · Radio Browser · minSdk 26 ·
 2. Conecta un dispositivo (o usa un emulador) y dale a **Run**.
 3. En la app, elige la carpeta donde está tu música (selector del sistema).
 
+### Firmar la release
+
+La release se firma con una clave propia, no con la de depuración. Esto importa:
+Android Studio genera la clave de depuración sola y es **distinta en cada
+máquina**, así que una app firmada con ella no se puede actualizar desde otro
+equipo — hay que desinstalar, perdiendo favoritos y la carpeta elegida.
+
+La clave y su contraseña van en `local.properties`, que está en `.gitignore`:
+
+```properties
+viby.keystore=/ruta/a/viby-release.jks
+viby.keystore.password=...
+viby.key.alias=viby
+viby.key.password=...
+```
+
+Sin esas claves el proyecto compila igual, pero la release cae a la clave de
+depuración y no podrá actualizar una instalación existente.
+
+> **Guarda copia del `.jks` y de la contraseña.** Es lo único que permite
+> actualizar la app; si se pierden, la única salida es desinstalar y empezar de
+> cero.
+
 ## Licencia
 
 Uso personal.

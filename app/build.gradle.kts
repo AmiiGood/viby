@@ -1,7 +1,19 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
 }
+
+// La clave de firma y su contrasena viven en local.properties, que esta en
+// .gitignore: nunca se suben al repo. Si faltan, la release cae a la clave de
+// depuracion para que el proyecto siga compilando en cualquier maquina, pero
+// ESA build no podra actualizar una instalacion firmada con la clave buena.
+val localProps = Properties().apply {
+    rootProject.file("local.properties").takeIf { it.exists() }
+        ?.inputStream()?.use { load(it) }
+}
+val vibyKeystore: String? = localProps.getProperty("viby.keystore")
 
 android {
     namespace = "com.sweetcode.viby"
@@ -21,6 +33,17 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        if (vibyKeystore != null) {
+            create("release") {
+                storeFile = file(vibyKeystore)
+                storePassword = localProps.getProperty("viby.keystore.password")
+                keyAlias = localProps.getProperty("viby.key.alias")
+                keyPassword = localProps.getProperty("viby.key.password")
+            }
+        }
+    }
+
     buildTypes {
         debug {
             // La build de pruebas se instala al lado de la Viby "de verdad" en vez de
@@ -34,8 +57,12 @@ android {
             // R8 desactivado: NewPipe/jaudiotagger usan reflexión y se romperían al ofuscar.
             // El salto de fluidez viene de que la release NO es debuggable.
             isMinifyEnabled = false
-            // Firma con la clave de depuración: instalable para uso personal (sideload).
-            signingConfig = signingConfigs.getByName("debug")
+            // Clave propia de release (ver local.properties). Es la unica forma de
+            // poder actualizar la app en el futuro: la clave de depuracion la genera
+            // Android Studio y es distinta en cada maquina, asi que perderla deja la
+            // app sin poder actualizarse nunca mas.
+            signingConfig = signingConfigs.findByName("release")
+                ?: signingConfigs.getByName("debug")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
