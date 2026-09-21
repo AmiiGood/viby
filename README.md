@@ -20,24 +20,19 @@ descubrir y descargar canciones nuevas desde la propia app.
   `Artista/Álbum/Título.m4a` con tags ID3 + carátula (enriquecido con MusicBrainz),
   en segundo plano con notificación de progreso y sin duplicados.
 - **Descubrir**: recomendaciones de música nueva basadas en tu biblioteca.
-- **Asistente de voz "Hey Viby"** (opcional): wake word + comandos por voz + respuesta hablada.
+- **Widget de inicio**: carátula, título, artista y controles anterior/pausa/siguiente,
+  con el color tomado de la portada que suena.
 
 ## Stack
 
-Kotlin · Jetpack Compose (Material 3) · Media3/ExoPlayer · Coil · NewPipeExtractor ·
-jaudiotagger · MusicBrainz · Vosk (wake word offline) · minSdk 26.
+Kotlin · Jetpack Compose (Material 3) · Media3/ExoPlayer · Coil · Glance (widget) ·
+NewPipeExtractor · jaudiotagger · MusicBrainz · minSdk 26 · targetSdk 36.
 
 ## Compilar
 
 1. Abre el proyecto en Android Studio y deja que sincronice Gradle.
 2. Conecta un dispositivo (o usa un emulador) y dale a **Run**.
 3. En la app, elige la carpeta donde está tu música (selector del sistema).
-
-### Asistente de voz (opcional)
-
-El "Hey Viby" usa **Vosk** (offline, sin cuenta ni keys). En la pantalla *Asistente*
-de la app, activa el interruptor: la primera vez descarga un modelo de voz en español
-(~40 MB) y pide permiso de micrófono. Luego di "Viby" y, tras el beep, tu orden.
 
 ## Licencia
 
