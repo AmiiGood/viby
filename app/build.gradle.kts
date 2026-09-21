@@ -65,7 +65,6 @@ dependencies {
     implementation(libs.jaudiotagger)
     implementation(libs.glance.appwidget)
     implementation(libs.androidx.palette)
-    implementation(libs.androidx.work.runtime)
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
