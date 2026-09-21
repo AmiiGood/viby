@@ -77,6 +77,7 @@ import com.sweetcode.viby.model.Song
 import com.sweetcode.viby.ui.components.AlbumArt
 import com.sweetcode.viby.ui.components.MiniPlayer
 import com.sweetcode.viby.ui.components.SongRow
+import com.sweetcode.viby.ui.components.VibyTabs
 import com.sweetcode.viby.ui.components.VibyTopBar
 import kotlinx.coroutines.launch
 
@@ -165,7 +166,8 @@ fun HomeScreen(
         Scaffold(
             containerColor = MaterialTheme.colorScheme.background,
             topBar = {
-                VibyTopBar(
+                Column {
+                    VibyTopBar(
                     title = {
                         if (tab == Tab.SONGS && searching) {
                             SearchField(query = query, onQueryChange = { query = it })
@@ -200,7 +202,14 @@ fun HomeScreen(
                             }
                         }
                     },
-                )
+                    )
+                    VibyTabs(
+                        labels = Tab.entries.map { it.label },
+                        selected = tabIndex,
+                        onSelect = { tabIndex = it },
+                        modifier = Modifier.padding(bottom = 8.dp),
+                    )
+                }
             },
             bottomBar = {
                 Column {
@@ -220,23 +229,6 @@ fun HomeScreen(
                             onNext = vm::next,
                             dragModifier = dragModifier,
                         )
-                    }
-                    NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
-                        Tab.entries.forEach { t ->
-                            NavigationBarItem(
-                                selected = tab == t,
-                                onClick = { tabIndex = t.ordinal },
-                                icon = { Icon(t.icon, contentDescription = t.label) },
-                                label = { Text(t.label) },
-                                colors = NavigationBarItemDefaults.colors(
-                                    selectedIconColor = MaterialTheme.colorScheme.onPrimary,
-                                    indicatorColor = MaterialTheme.colorScheme.primary,
-                                    selectedTextColor = MaterialTheme.colorScheme.primary,
-                                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                ),
-                            )
-                        }
                     }
                 }
             },
@@ -266,7 +258,7 @@ fun HomeScreen(
                                 }
                             }
                             val onPlay = remember(displayed) { fn@{ i: Int -> vm.play(displayed, i) } }
-                            SongList(displayed, state.currentSong?.id, favorites, onPlay, onToggleFavorite)
+                            SongList(displayed, state.currentSong?.id, favorites, state.isPlaying, onPlay, onToggleFavorite)
                         }
 
                         Tab.ALBUMS -> AlbumList(songs, onOpenAlbum)
@@ -279,7 +271,7 @@ fun HomeScreen(
                                 EmptyHint("Aún no tienes favoritos.\nToca el ❤ en una canción para agregarla.")
                             } else {
                                 val onPlayFav = remember(favSongs) { fn@{ i: Int -> vm.play(favSongs, i) } }
-                                SongList(favSongs, state.currentSong?.id, favorites, onPlayFav, onToggleFavorite)
+                                SongList(favSongs, state.currentSong?.id, favorites, state.isPlaying, onPlayFav, onToggleFavorite)
                             }
                         }
                     }
@@ -322,6 +314,7 @@ private fun SongList(
     songs: List<Song>,
     currentId: String?,
     favorites: Set<String>,
+    isPlaying: Boolean,
     onPlay: (Int) -> Unit,
     onToggleFavorite: (String) -> Unit,
 ) {
@@ -333,6 +326,7 @@ private fun SongList(
                 isFavorite = song.id in favorites,
                 onClick = { onPlay(index) },
                 onToggleFavorite = { onToggleFavorite(song.id) },
+                isPlaying = isPlaying,
             )
         }
     }

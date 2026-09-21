@@ -34,6 +34,7 @@ fun SongRow(
     onClick: () -> Unit,
     onToggleFavorite: () -> Unit,
     modifier: Modifier = Modifier,
+    isPlaying: Boolean = false,
 ) {
     Row(
         modifier = modifier
@@ -63,6 +64,14 @@ fun SongRow(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+        }
+        // Marca la pista en curso sin gastar texto, y distingue sonando de pausada.
+        if (isCurrent) {
+            PlayingBars(
+                color = MaterialTheme.colorScheme.primary,
+                animando = isPlaying,
+            )
+            Spacer(Modifier.width(10.dp))
         }
         IconButton(onClick = onToggleFavorite) {
             Icon(
