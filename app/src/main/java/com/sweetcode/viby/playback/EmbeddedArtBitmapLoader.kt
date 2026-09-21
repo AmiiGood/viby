@@ -13,9 +13,12 @@ import com.google.common.util.concurrent.MoreExecutors
 import java.util.concurrent.Executors
 
 /**
- * Cargador de carátulas para Media3: extrae la imagen embebida (APIC) del archivo
- * de audio cuyo URI llega como `artworkUri`. Así la notificación y la pantalla
- * bloqueada muestran la portada del álbum. Cachea la última para no re-extraer.
+ * Cargador de carátulas para Media3.
+ *
+ * Dos casos: los archivos de audio locales llevan la imagen embebida (APIC) y hay
+ * que extraerla; las emisoras de radio no tienen nada embebido, asi que su
+ * caratula llega ya descargada como fichero de imagen y solo hay que decodificarla.
+ * Cachea la ultima para no repetir el trabajo.
  */
 @UnstableApi
 class EmbeddedArtBitmapLoader(private val context: Context) : BitmapLoader {
@@ -37,18 +40,37 @@ class EmbeddedArtBitmapLoader(private val context: Context) : BitmapLoader {
     override fun loadBitmap(uri: Uri): ListenableFuture<Bitmap> {
         cacheBitmap?.let { if (uri.toString() == cacheUri) return Futures.immediateFuture(it) }
         return executor.submit<Bitmap> {
-            val retriever = MediaMetadataRetriever()
-            try {
-                retriever.setDataSource(context, uri)
-                val bytes = retriever.embeddedPicture ?: error("Sin carátula embebida")
-                val bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-                    ?: error("No se pudo decodificar la carátula")
-                cacheUri = uri.toString()
-                cacheBitmap = bmp
-                bmp
-            } finally {
-                runCatching { retriever.release() }
-            }
+            val bmp = decodeImageFile(uri) ?: extractEmbedded(uri)
+            cacheUri = uri.toString()
+            cacheBitmap = bmp
+            bmp
+        }
+    }
+
+    /**
+     * Caratula de emisora: ya es una imagen en disco, descargada por
+     * NowPlayingArtwork. MediaMetadataRetriever no sirve aqui porque busca una
+     * imagen DENTRO de un archivo de audio, y esto ya es la imagen.
+     */
+    private fun decodeImageFile(uri: Uri): Bitmap? {
+        if (uri.scheme != "file") return null
+        val path = uri.path ?: return null
+        if (!path.endsWith(".jpg", ignoreCase = true) &&
+            !path.endsWith(".png", ignoreCase = true)
+        ) return null
+        return BitmapFactory.decodeFile(path)
+    }
+
+    /** Archivo de audio local: la portada va embebida en las etiquetas. */
+    private fun extractEmbedded(uri: Uri): Bitmap {
+        val retriever = MediaMetadataRetriever()
+        try {
+            retriever.setDataSource(context, uri)
+            val bytes = retriever.embeddedPicture ?: error("Sin carátula embebida")
+            return BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                ?: error("No se pudo decodificar la carátula")
+        } finally {
+            runCatching { retriever.release() }
         }
     }
 }

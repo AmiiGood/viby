@@ -4,6 +4,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.media.AudioManager
+import android.net.Uri
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Metadata
@@ -16,6 +17,7 @@ import androidx.media3.session.MediaSessionService
 import androidx.media3.extractor.metadata.icy.IcyInfo
 import com.sweetcode.viby.MainActivity
 import com.sweetcode.viby.data.coverThumbFile
+import com.sweetcode.viby.radio.NowPlayingArtwork
 import com.sweetcode.viby.widget.updateVibyWidget
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -42,6 +44,8 @@ class PlaybackService : MediaSessionService() {
     // hay que guardarlo antes de la primera actualizacion para no perderlo.
     private var stationName: String? = null
     private var currentItemId: String? = null
+    private val artwork by lazy { NowPlayingArtwork(applicationContext) }
+    private var artworkJob: Job? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -76,6 +80,7 @@ class PlaybackService : MediaSessionService() {
             if (id != currentItemId) {
                 currentItemId = id
                 stationName = mediaItem?.mediaMetadata?.title?.toString()
+                cacheStationLogo(mediaItem)
             }
             refreshWidget()
         }
@@ -119,6 +124,50 @@ class PlaybackService : MediaSessionService() {
             )
             .build()
         runCatching { player.replaceMediaItem(player.currentMediaItemIndex, updated) }
+        resolveArtwork(title)
+    }
+
+    /**
+     * El logo de la emisora llega como URL http, y ni la notificacion ni el widget
+     * saben cargar eso: se baja a disco y se apunta al fichero. Es lo que se ve
+     * mientras no se sabe que cancion suena.
+     */
+    private fun cacheStationLogo(item: MediaItem?) {
+        val url = item?.mediaMetadata?.artworkUri?.takeIf { it.scheme?.startsWith("http") == true }
+            ?: return
+        val mediaId = item.mediaId
+        scope.launch {
+            val file = artwork.logo(url.toString()) ?: return@launch
+            applyArtwork(file) { it.mediaId == mediaId }
+        }
+    }
+
+    /**
+     * Busca la caratula del disco al que pertenece lo que suena. Es lo unico que
+     * sale a la red por cancion, asi que se cancela la busqueda anterior: si la
+     * emisora cambio de tema, la caratula que venia en camino ya no vale.
+     */
+    private fun resolveArtwork(title: String) {
+        artworkJob?.cancel()
+        artworkJob = scope.launch {
+            val file = artwork.resolve(title) ?: return@launch
+            applyArtwork(file) { it.mediaMetadata.title?.toString() == title }
+        }
+    }
+
+    /** Aplica la caratula solo si [stillValid]: entre la busqueda y la respuesta
+     *  la emisora ha podido cambiar de cancion. */
+    private fun applyArtwork(file: java.io.File, stillValid: (MediaItem) -> Boolean) {
+        val player = mediaSession?.player ?: return
+        val item = player.currentMediaItem ?: return
+        if (!stillValid(item)) return
+        val uri = Uri.fromFile(file)
+        if (item.mediaMetadata.artworkUri == uri) return
+        val updated = item.buildUpon()
+            .setMediaMetadata(item.mediaMetadata.buildUpon().setArtworkUri(uri).build())
+            .build()
+        runCatching { player.replaceMediaItem(player.currentMediaItemIndex, updated) }
+        refreshWidget()
     }
 
     /**
@@ -154,7 +203,12 @@ class PlaybackService : MediaSessionService() {
             val player = mediaSession?.player ?: return@launch
             val md = player.currentMediaItem?.mediaMetadata
             val uri = player.currentMediaItem?.localConfiguration?.uri
-            val thumb = uri?.let {
+            // Radio: la caratula ya es un fichero de imagen. Biblioteca: miniatura
+            // extraida del propio archivo de audio.
+            val downloaded = player.currentMediaItem?.mediaMetadata?.artworkUri
+                ?.takeIf { it.scheme == "file" }?.path
+                ?.takeIf { java.io.File(it).exists() }
+            val thumb = downloaded ?: uri?.let {
                 coverThumbFile(applicationContext, it.toString()).takeIf { f -> f.exists() }?.absolutePath
             }
             runCatching {
