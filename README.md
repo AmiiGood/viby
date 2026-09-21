@@ -7,6 +7,10 @@ descubrir y descargar canciones nuevas desde la propia app.
 
 > Proyecto personal. Uso sideload (no Play Store).
 
+| Biblioteca | Radio | Reproduciendo |
+|:---:|:---:|:---:|
+| ![Biblioteca](docs/capturas/biblioteca.png) | ![Radio](docs/capturas/radio.png) | ![Reproduciendo](docs/capturas/reproduciendo.png) |
+
 ## Qué hace
 
 - **Reproductor** con cola, aleatorio real, repetir, búsqueda y favoritos.
