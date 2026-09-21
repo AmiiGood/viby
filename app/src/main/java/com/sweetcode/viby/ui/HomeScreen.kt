@@ -38,29 +38,22 @@ import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FolderOpen
 import androidx.compose.material.icons.rounded.LibraryMusic
 import androidx.compose.material.icons.rounded.MusicNote
-import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.Person
-import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Radio
 import androidx.compose.material.icons.rounded.Search
-import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -84,6 +77,7 @@ import com.sweetcode.viby.model.Song
 import com.sweetcode.viby.ui.components.AlbumArt
 import com.sweetcode.viby.ui.components.MiniPlayer
 import com.sweetcode.viby.ui.components.SongRow
+import com.sweetcode.viby.ui.components.VibyTopBar
 import kotlinx.coroutines.launch
 
 private enum class Tab(val label: String, val icon: ImageVector) {
@@ -170,7 +164,7 @@ fun HomeScreen(
         Scaffold(
             containerColor = MaterialTheme.colorScheme.background,
             topBar = {
-                TopAppBar(
+                VibyTopBar(
                     title = {
                         if (tab == Tab.SONGS && searching) {
                             SearchField(query = query, onQueryChange = { query = it })
@@ -178,10 +172,6 @@ fun HomeScreen(
                             Text(if (tab == Tab.SONGS) "Viby" else tab.label, fontWeight = FontWeight.Bold)
                         }
                     },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.background,
-                        titleContentColor = MaterialTheme.colorScheme.onBackground,
-                    ),
                     actions = {
                         if (tab == Tab.SONGS) {
                             IconButton(onClick = {
