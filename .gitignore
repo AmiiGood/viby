@@ -7,6 +7,16 @@
 /.idea/workspace.xml
 /.idea/navEditor.xml
 /.idea/assetWizardSettings.xml
+# Guardan rutas y estado de la maquina (JDK, JVM de Gradle, ultimo dispositivo
+# elegido), asi que cambian solos y ensucian los diffs sin aportar nada.
+/.idea/misc.xml
+/.idea/gradle.xml
+/.idea/compiler.xml
+/.idea/deploymentTargetSelector.xml
+/.idea/AndroidProjectSystem.xml
+/.idea/markdown.xml
+/.idea/deploymentTargetDropDown.xml
+/.idea/shelf
 .DS_Store
 /build
 /captures
