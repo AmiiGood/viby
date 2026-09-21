@@ -1,5 +1,7 @@
 package com.sweetcode.viby.ui
 
+import android.content.Intent
+import android.os.Build
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -24,6 +26,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Equalizer
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
+import androidx.compose.material.icons.rounded.Headphones
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
@@ -54,6 +57,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -133,6 +137,27 @@ fun NowPlayingScreen(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
+                // Salida de audio: abre el selector del sistema, que es quien
+                // sabe de verdad qué dispositivos hay conectados.
+                val contexto = LocalContext.current
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    IconButton(onClick = {
+                        // No hay constante pública para este panel; la acción va por
+                        // nombre y no existe en todos los dispositivos, de ahí el runCatching.
+                        runCatching {
+                            contexto.startActivity(
+                                Intent("com.android.settings.panel.action.MEDIA_OUTPUT")
+                                    .putExtra("package_name", contexto.packageName)
+                            )
+                        }
+                    }) {
+                        Icon(
+                            Icons.Rounded.Headphones,
+                            contentDescription = "Salida de audio",
+                            tint = Color.White.copy(alpha = 0.8f),
+                        )
+                    }
+                }
                 IconButton(onClick = onOpenEqualizer) {
                     Icon(
                         Icons.Rounded.Equalizer,
@@ -153,57 +178,94 @@ fun NowPlayingScreen(
 
             // Carátula grande
             val artModifier = Modifier
-                .fillMaxWidth()
+                .fillMaxWidth(0.88f)
                 .aspectRatio(1f)
-                .clip(RoundedCornerShape(20.dp))
-            if (state.currentStation != null) {
-                AsyncImage(
-                    model = artModel,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = artModifier.background(MaterialTheme.colorScheme.surfaceVariant),
+                .clip(RoundedCornerShape(22.dp))
+            Box(
+                modifier = Modifier.fillMaxWidth().aspectRatio(1f),
+                contentAlignment = Alignment.Center,
+            ) {
+                // Halo del color de la portada: da profundidad sin desenfocarla entera.
+                Box(
+                    Modifier.fillMaxSize().background(
+                        Brush.radialGradient(
+                            colors = listOf(
+                                paleta.acento.copy(alpha = 0.30f),
+                                Color.Transparent,
+                            ),
+                        )
+                    )
                 )
-            } else {
-                AlbumArt(uri = song.uri, modifier = artModifier)
+                if (state.currentStation != null) {
+                    AsyncImage(
+                        model = artModel,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = artModifier.background(MaterialTheme.colorScheme.surfaceVariant),
+                    )
+                } else {
+                    AlbumArt(uri = song.uri, modifier = artModifier)
+                }
             }
 
             Spacer(Modifier.height(32.dp))
 
-            // Título / artista, con el favorito a su derecha
-            Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                text = song.title,
-                fontSize = 30.sp,
-                lineHeight = 34.sp,
-                letterSpacing = (-0.6).sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.White,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f),
-                textAlign = TextAlign.Start,
-            )
-            IconButton(onClick = onToggleFavorite) {
-                Icon(
-                    imageVector = if (isFavorite) Icons.Rounded.Favorite
-                    else Icons.Rounded.FavoriteBorder,
-                    contentDescription = if (isFavorite) "Quitar de favoritos"
-                    else "Agregar a favoritos",
-                    tint = if (isFavorite) MaterialTheme.colorScheme.tertiary
-                    else Color.White.copy(alpha = 0.55f),
+            // Título / artista / álbum, centrados. El favorito va a la derecha del título.
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Spacer(Modifier.size(48.dp))
+                Text(
+                    text = song.title,
+                    fontSize = 26.sp,
+                    lineHeight = 30.sp,
+                    letterSpacing = (-0.4).sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                    textAlign = TextAlign.Center,
                 )
-            }
+                IconButton(onClick = onToggleFavorite) {
+                    Icon(
+                        imageVector = if (isFavorite) Icons.Rounded.Favorite
+                        else Icons.Rounded.FavoriteBorder,
+                        contentDescription = if (isFavorite) "Quitar de favoritos"
+                        else "Agregar a favoritos",
+                        tint = if (isFavorite) MaterialTheme.colorScheme.tertiary
+                        else Color.White.copy(alpha = 0.55f),
+                    )
+                }
             }
             Spacer(Modifier.height(2.dp))
             Text(
                 text = song.artist,
                 style = MaterialTheme.typography.bodyLarge,
-                color = Color.White.copy(alpha = 0.6f),
+                color = Color.White.copy(alpha = 0.62f),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.fillMaxWidth(),
-                textAlign = TextAlign.Start,
+                textAlign = TextAlign.Center,
             )
+            // Tercer nivel: el álbum daba contexto y no estaba en ningún sitio.
+            val contexto = listOfNotNull(
+                song.album.ifBlank { null },
+                state.currentStation?.subtitle?.ifBlank { null },
+            ).firstOrNull()
+            if (contexto != null) {
+                Spacer(Modifier.height(3.dp))
+                Text(
+                    text = contexto,
+                    fontSize = 12.sp,
+                    color = Color.White.copy(alpha = 0.34f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Center,
+                )
+            }
 
             Spacer(Modifier.height(20.dp))
 
