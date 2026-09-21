@@ -22,8 +22,16 @@ android {
     }
 
     buildTypes {
+        debug {
+            // La build de pruebas se instala al lado de la Viby "de verdad" en vez de
+            // chocar con ella: la release se firma con la clave de depuracion de la
+            // maquina donde se compilo, asi que instalar desde otra maquina fallaria
+            // con INSTALL_FAILED_UPDATE_INCOMPATIBLE y obligaria a desinstalar.
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-debug"
+        }
         release {
-            // R8 desactivado: NewPipe/Vosk/jaudiotagger usan reflexión y se romperían al ofuscar.
+            // R8 desactivado: NewPipe/jaudiotagger usan reflexión y se romperían al ofuscar.
             // El salto de fluidez viene de que la release NO es debuggable.
             isMinifyEnabled = false
             // Firma con la clave de depuración: instalable para uso personal (sideload).
