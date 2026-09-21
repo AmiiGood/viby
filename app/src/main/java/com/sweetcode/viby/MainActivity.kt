@@ -86,6 +86,7 @@ private fun VibyApp() {
                 nowPlaying = state.currentSong,
                 isPlaying = state.isPlaying,
                 onPlayPause = vm::togglePlay,
+                artworkUri = state.artworkUri,
             )
         }
         composable("discover") {

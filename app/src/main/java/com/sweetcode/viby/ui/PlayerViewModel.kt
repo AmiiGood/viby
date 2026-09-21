@@ -290,6 +290,9 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
             ?: songById[c.currentMediaItem?.mediaId]
         _uiState.value = _uiState.value.copy(
             currentStation = station,
+            // La pone el servicio: logo de la emisora primero y, en cuanto se
+            // sabe que suena, la portada del disco.
+            artworkUri = c.mediaMetadata.artworkUri,
             currentSong = current,
             currentIndex = c.currentMediaItemIndex,
             isPlaying = c.isPlaying,
@@ -373,6 +376,9 @@ data class PlayerUiState(
     val currentSong: Song? = null,
     /** No null mientras suena una emisora: la UI esconde progreso, seek y cola. */
     val currentStation: Station? = null,
+    /** Caratula resuelta para lo que suena. Solo util en radio: una cancion
+     *  local lleva la suya embebida y se extrae del propio archivo. */
+    val artworkUri: Uri? = null,
     val currentIndex: Int = 0,
     val isPlaying: Boolean = false,
     val positionMs: Long = 0L,

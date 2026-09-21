@@ -220,9 +220,10 @@ fun HomeScreen(
                             // null = sin barra: emisora en vivo o duracion aun desconocida.
                             progress = if (state.durationMs > 0)
                                 state.positionMs.toFloat() / state.durationMs else null,
-                            // Una emisora no tiene caratula embebida que extraer: su logo
-                            // viene del directorio.
-                            artworkUrl = state.currentStation?.faviconUrl?.takeIf { it.isNotBlank() },
+                            // Una emisora no tiene caratula embebida que extraer: el
+                            // servicio resuelve su portada (o su logo) a un fichero.
+                            artworkUrl = state.artworkUri?.takeIf { state.currentStation != null }
+                                ?.toString(),
                             onExpand = { settle(true) },
                             onPlayPause = vm::togglePlay,
                             onNext = vm::next,

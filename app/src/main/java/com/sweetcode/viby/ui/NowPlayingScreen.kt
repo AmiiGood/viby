@@ -74,6 +74,11 @@ fun NowPlayingScreen(
     onToggleShuffle: () -> Unit,
     onCycleRepeat: () -> Unit,
 ) {
+    // Una emisora no tiene caratula embebida que extraer de su URL: la portada
+    // la resuelve el servicio y llega ya como fichero en artworkUri.
+    val artModel: Any = state.artworkUri?.takeIf { state.currentStation != null }
+        ?: AudioCover(song.uri)
+
     Box(
         Modifier
             .fillMaxSize()
@@ -81,7 +86,7 @@ fun NowPlayingScreen(
     ) {
         // Fondo desenfocado con la carátula
         AsyncImage(
-            model = AudioCover(song.uri),
+            model = artModel,
             contentDescription = null,
             contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxSize().blur(60.dp),
@@ -146,13 +151,20 @@ fun NowPlayingScreen(
             Spacer(Modifier.weight(1f))
 
             // Carátula grande
-            AlbumArt(
-                uri = song.uri,
-                modifier = Modifier
-                    .fillMaxWidth(0.82f)
-                    .aspectRatio(1f)
-                    .clip(RoundedCornerShape(20.dp)),
-            )
+            val artModifier = Modifier
+                .fillMaxWidth(0.82f)
+                .aspectRatio(1f)
+                .clip(RoundedCornerShape(20.dp))
+            if (state.currentStation != null) {
+                AsyncImage(
+                    model = artModel,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = artModifier.background(MaterialTheme.colorScheme.surfaceVariant),
+                )
+            } else {
+                AlbumArt(uri = song.uri, modifier = artModifier)
+            }
 
             Spacer(Modifier.height(32.dp))
 

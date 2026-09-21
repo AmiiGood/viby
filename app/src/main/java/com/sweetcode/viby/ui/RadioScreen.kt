@@ -73,6 +73,7 @@ fun RadioScreen(
     nowPlaying: Song?,
     isPlaying: Boolean,
     onPlayPause: () -> Unit,
+    artworkUri: android.net.Uri? = null,
 ) {
     val playingStationId = playingStation?.id
     val vm: RadioViewModel = viewModel()
@@ -110,7 +111,7 @@ fun RadioScreen(
                     song = nowPlaying,
                     isPlaying = isPlaying,
                     progress = null, // en vivo: no hay barra que llenar
-                    artworkUrl = playingStation.faviconUrl.takeIf { it.isNotBlank() },
+                    artworkUrl = artworkUri?.toString() ?: playingStation.faviconUrl.takeIf { it.isNotBlank() },
                     onExpand = onBack, // el reproductor completo vive en la pantalla de inicio
                     onPlayPause = onPlayPause,
                     // Sin "siguiente": una emisora no tiene cola detras.
