@@ -15,6 +15,7 @@ import com.google.common.util.concurrent.ListenableFuture
 import com.google.common.util.concurrent.MoreExecutors
 import com.sweetcode.viby.data.MusicRepository
 import com.sweetcode.viby.model.Song
+import com.sweetcode.viby.model.Station
 import com.sweetcode.viby.playback.PlaybackService
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -39,6 +40,9 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
     val favorites: StateFlow<Set<String>> = _favorites.asStateFlow()
 
     private var songById: Map<String, Song> = emptyMap()
+
+    // Emisora sonando ahora, o null si suena la biblioteca. Manda sobre currentSong.
+    private var playingStation: Station? = null
 
     // Orden lógico de la cola (sin barajar) y estado de aleatorio propio.
     // Manejamos el shuffle nosotros para garantizar un rebarajado real cada vez.
@@ -127,6 +131,7 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
     fun play(list: List<Song>, index: Int) {
         val c = controller ?: return
         if (index !in list.indices) return
+        playingStation = null
         // La cola = lo que tocaste + el resto de la biblioteca a continuación,
         // para que al terminar la lista siga sonando con las demás canciones.
         val contextIds = list.mapTo(HashSet()) { it.id }
@@ -139,6 +144,24 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
         c.prepare()
         c.play()
         persistPlayback()
+    }
+
+    /**
+     * Sintoniza una emisora. Sustituye la cola entera por el stream: mezclarlo con
+     * canciones no tiene sentido (no termina nunca) y ademas romperia el orden.
+     *
+     * A proposito NO llama a persistPlayback(): asi se conserva intacta la cola de
+     * musica guardada y al volver a abrir la app se reanuda donde la dejaste.
+     */
+    fun playStation(station: Station) {
+        val c = controller ?: return
+        playingStation = station
+        baseOrder = emptyList()
+        _queue.value = emptyList()
+        c.setMediaItems(listOf(station.toMediaItem()), 0, 0L)
+        c.prepare()
+        c.play()
+        syncFromPlayer()
     }
 
     fun togglePlay() {
@@ -232,6 +255,7 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
 
     fun playQueueIndex(index: Int) {
         val c = controller ?: return
+        playingStation = null
         c.seekToDefaultPosition(index)
         c.play()
     }
@@ -249,9 +273,17 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun syncFromPlayer() {
         val c = controller ?: return
-        val current = _queue.value.getOrNull(c.currentMediaItemIndex)
+        // Solo se considera modo radio cuando el reproductor ya confirmo el stream.
+        // No se borra playingStation aqui: entre pedir la emisora y que el
+        // controlador lo refleje hay un instante en que aun no coinciden, y
+        // borrarlo ahi apagaria el modo radio nada mas encenderlo. Se limpia
+        // explicitamente cuando arranca la biblioteca.
+        val station = playingStation?.takeIf { it.id == c.currentMediaItem?.mediaId }
+        val current = station?.asSong()
+            ?: _queue.value.getOrNull(c.currentMediaItemIndex)
             ?: songById[c.currentMediaItem?.mediaId]
         _uiState.value = _uiState.value.copy(
+            currentStation = station,
             currentSong = current,
             currentIndex = c.currentMediaItemIndex,
             isPlaying = c.isPlaying,
@@ -333,6 +365,8 @@ data class PlayerUiState(
     val hasFolder: Boolean = false,
     val isLoading: Boolean = false,
     val currentSong: Song? = null,
+    /** No null mientras suena una emisora: la UI esconde progreso, seek y cola. */
+    val currentStation: Station? = null,
     val currentIndex: Int = 0,
     val isPlaying: Boolean = false,
     val positionMs: Long = 0L,
@@ -351,6 +385,32 @@ private fun Song.toMediaItem(): MediaItem =
                 .setArtist(artist)
                 .setAlbumTitle(album)
                 .setArtworkUri(uri) // el loader extrae la carátula embebida de este archivo
+                .build()
+        )
+        .build()
+
+/**
+ * Un stream no tiene duracion ni caratula embebida: se representa como [Song] con
+ * durationMs = 0, que es justo la senal que la UI ya usa para no dibujar progreso.
+ */
+private fun Station.asSong(): Song = Song(
+    id = id,
+    uri = Uri.parse(streamUrl),
+    title = name,
+    artist = subtitle,
+    album = "",
+    durationMs = 0L,
+)
+
+private fun Station.toMediaItem(): MediaItem =
+    MediaItem.Builder()
+        .setUri(streamUrl)
+        .setMediaId(id)
+        .setMediaMetadata(
+            MediaMetadata.Builder()
+                .setTitle(name)
+                .setArtist(subtitle)
+                .setArtworkUri(faviconUrl.takeIf { it.isNotBlank() }?.let(Uri::parse))
                 .build()
         )
         .build()

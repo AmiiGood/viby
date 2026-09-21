@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Las emisoras del directorio de Radio Browser son de terceros y muchas todavía
+    sirven su stream por HTTP sin cifrar, con dominios que no se conocen hasta que
+    el usuario busca. Por eso no se puede acotar por dominio: o se permite el
+    tráfico en claro, o esas emisoras fallan sin explicación.
+
+    El tráfico propio de la app (Radio Browser, MusicBrainz, NewPipe) va por HTTPS
+    de forma explícita en el código, así que esto no lo degrada.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

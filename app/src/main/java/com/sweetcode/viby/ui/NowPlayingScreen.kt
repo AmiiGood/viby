@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -179,12 +180,17 @@ fun NowPlayingScreen(
 
             Spacer(Modifier.height(20.dp))
 
-            // Barra de progreso arrastrable
-            SeekBar(
-                positionMs = state.positionMs,
-                durationMs = state.durationMs,
-                onSeek = onSeek,
-            )
+            // Un stream en vivo no tiene duracion ni permite buscar dentro.
+            if (state.currentStation != null) {
+                LiveIndicator()
+            } else {
+                // Barra de progreso arrastrable
+                SeekBar(
+                    positionMs = state.positionMs,
+                    durationMs = state.durationMs,
+                    onSeek = onSeek,
+                )
+            }
 
             Spacer(Modifier.height(12.dp))
 
@@ -292,5 +298,29 @@ private fun SeekBar(positionMs: Long, durationMs: Long, onSeek: (Long) -> Unit) 
                 color = Color.White.copy(alpha = 0.7f),
             )
         }
+    }
+}
+
+/** Sustituye a la barra de progreso cuando lo que suena es una emisora. */
+@Composable
+private fun LiveIndicator() {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            Modifier
+                .size(8.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.primary)
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(
+            text = "EN VIVO",
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary,
+        )
     }
 }

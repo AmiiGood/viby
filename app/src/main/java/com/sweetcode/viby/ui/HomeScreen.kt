@@ -41,6 +41,7 @@ import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Radio
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.material3.Button
@@ -99,6 +100,7 @@ fun HomeScreen(
     onOpenEqualizer: () -> Unit,
     onOpenDownload: () -> Unit,
     onOpenDiscover: () -> Unit,
+    onOpenRadio: () -> Unit,
     onOpenAlbum: (String) -> Unit,
     onOpenArtist: (String) -> Unit,
 ) {
@@ -192,6 +194,9 @@ fun HomeScreen(
                             }
                         }
                         if (!searching) {
+                            IconButton(onClick = onOpenRadio) {
+                                Icon(Icons.Rounded.Radio, contentDescription = "Radio")
+                            }
                             IconButton(onClick = onOpenDiscover) {
                                 Icon(Icons.Rounded.AutoAwesome, contentDescription = "Descubrir")
                             }
@@ -211,8 +216,9 @@ fun HomeScreen(
                         MiniPlayer(
                             song = song,
                             isPlaying = state.isPlaying,
+                            // null = sin barra: emisora en vivo o duracion aun desconocida.
                             progress = if (state.durationMs > 0)
-                                state.positionMs.toFloat() / state.durationMs else 0f,
+                                state.positionMs.toFloat() / state.durationMs else null,
                             onExpand = { settle(true) },
                             onPlayPause = vm::togglePlay,
                             onNext = vm::next,
@@ -424,7 +430,7 @@ private fun SearchField(query: String, onQueryChange: (String) -> Unit) {
 private fun MiniPlayer(
     song: Song,
     isPlaying: Boolean,
-    progress: Float,
+    progress: Float?,
     onExpand: () -> Unit,
     onPlayPause: () -> Unit,
     onNext: () -> Unit,
@@ -432,7 +438,7 @@ private fun MiniPlayer(
 ) {
     Surface(color = MaterialTheme.colorScheme.surface, tonalElevation = 3.dp, modifier = dragModifier) {
         Column(modifier = Modifier.clickable(onClick = onExpand)) {
-            LinearProgressIndicator(
+            if (progress != null) LinearProgressIndicator(
                 progress = { progress.coerceIn(0f, 1f) },
                 modifier = Modifier.fillMaxWidth().height(2.dp),
                 color = MaterialTheme.colorScheme.primary,

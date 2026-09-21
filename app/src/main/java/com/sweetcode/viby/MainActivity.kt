@@ -30,6 +30,7 @@ import com.sweetcode.viby.ui.EqualizerScreen
 import com.sweetcode.viby.ui.HomeScreen
 import com.sweetcode.viby.ui.PlayerViewModel
 import com.sweetcode.viby.ui.QueueScreen
+import com.sweetcode.viby.ui.RadioScreen
 import com.sweetcode.viby.ui.theme.VibyTheme
 
 class MainActivity : ComponentActivity() {
@@ -65,6 +66,7 @@ private fun VibyApp() {
                 onOpenEqualizer = { nav.navigate("equalizer") },
                 onOpenDownload = { nav.navigate("download") },
                 onOpenDiscover = { nav.navigate("discover") },
+                onOpenRadio = { nav.navigate("radio") },
                 onOpenAlbum = { name -> nav.navigate("album/${Uri.encode(name)}") },
                 onOpenArtist = { name -> nav.navigate("artist/${Uri.encode(name)}") },
             )
@@ -74,6 +76,14 @@ private fun VibyApp() {
         }
         composable("download") {
             DownloadScreen(onBack = { nav.popBackStack() })
+        }
+        composable("radio") {
+            val state by vm.uiState.collectAsStateWithLifecycle()
+            RadioScreen(
+                onBack = { nav.popBackStack() },
+                onPlay = vm::playStation,
+                playingStationId = state.currentStation?.id,
+            )
         }
         composable("discover") {
             val songs by vm.songs.collectAsStateWithLifecycle()

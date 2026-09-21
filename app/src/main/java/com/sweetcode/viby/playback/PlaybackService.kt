@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.media.AudioManager
 import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
@@ -30,6 +31,9 @@ class PlaybackService : MediaSessionService() {
 
     private var mediaSession: MediaSession? = null
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+
+    // Reintentos de reconexion del stream en curso; se ponen a cero al volver a sonar.
+    private var streamRetries = 0
 
     override fun onCreate() {
         super.onCreate()
@@ -60,8 +64,35 @@ class PlaybackService : MediaSessionService() {
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
             refreshWidget()
         }
-        override fun onIsPlayingChanged(isPlaying: Boolean) = refreshWidget()
+        override fun onIsPlayingChanged(isPlaying: Boolean) {
+            if (isPlaying) streamRetries = 0
+            refreshWidget()
+        }
         override fun onPlaybackStateChanged(playbackState: Int) = refreshWidget()
+        override fun onPlayerError(error: PlaybackException) = reconnectStream()
+    }
+
+    /**
+     * Un stream de radio se corta cada dos por tres (red inestable, servidor que
+     * recicla la conexion). ExoPlayer se queda parado con el error, asi que se
+     * reintenta con espera creciente en vez de dejar la emisora muda.
+     *
+     * Solo aplica a fuentes http: un archivo local que falla no se arregla
+     * reintentando, y ahi conviene que el error se vea.
+     */
+    private fun reconnectStream() {
+        val player = mediaSession?.player ?: return
+        val uri = player.currentMediaItem?.localConfiguration?.uri?.toString().orEmpty()
+        if (!uri.startsWith("http")) return
+        if (streamRetries >= MAX_STREAM_RETRIES) return
+        streamRetries++
+        scope.launch {
+            delay(RETRY_BASE_DELAY_MS * streamRetries)
+            mediaSession?.player?.run {
+                prepare()
+                play()
+            }
+        }
     }
 
     private var updateJob: Job? = null
@@ -123,6 +154,10 @@ class PlaybackService : MediaSessionService() {
     }
 
     companion object {
+        /** Cuantas veces se reintenta reconectar un stream antes de rendirse. */
+        private const val MAX_STREAM_RETRIES = 5
+        private const val RETRY_BASE_DELAY_MS = 1500L
+
         /** Sesión de audio del reproductor (0 = aún no disponible). */
         var audioSessionId: Int = 0
             private set
