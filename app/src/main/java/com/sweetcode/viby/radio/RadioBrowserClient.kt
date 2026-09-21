@@ -18,17 +18,40 @@ import java.net.URLEncoder
  */
 class RadioBrowserClient(private val client: OkHttpClient) {
 
+    /**
+     * Todas las consultas van por el mismo endpoint de búsqueda porque es el único
+     * que admite combinar filtros: los atajos /bytag y /topclick no aceptan idioma,
+     * y sin poder cruzarlos el filtro por idioma se perdería al tocar un género.
+     *
+     * @param idioma nombre en inglés tal como lo indexa el catálogo ("spanish"),
+     *   o null para no filtrar.
+     */
+    private suspend fun buscar(
+        nombre: String? = null,
+        etiqueta: String? = null,
+        idioma: String? = null,
+        limit: Int = 60,
+    ): List<Station> {
+        val filtros = buildString {
+            append("limit=$limit&hidebroken=true&order=clickcount&reverse=true")
+            nombre?.takeIf { it.isNotBlank() }?.let { append("&name=${enc(it)}") }
+            etiqueta?.takeIf { it.isNotBlank() }?.let { append("&tag=${enc(it)}") }
+            idioma?.takeIf { it.isNotBlank() }?.let { append("&language=${enc(it)}") }
+        }
+        return get("$BASE/json/stations/search?$filtros")
+    }
+
     /** Las más escuchadas: es lo que se ve al abrir la pantalla, sin buscar nada. */
-    suspend fun topStations(limit: Int = 60): List<Station> =
-        get("$BASE/json/stations/topclick/$limit")
+    suspend fun topStations(idioma: String? = null, limit: Int = 60): List<Station> =
+        buscar(idioma = idioma, limit = limit)
 
     /** Busca por nombre de emisora. */
-    suspend fun search(query: String, limit: Int = 60): List<Station> =
-        get("$BASE/json/stations/search?name=${enc(query)}&limit=$limit&hidebroken=true&order=clickcount&reverse=true")
+    suspend fun search(query: String, idioma: String? = null, limit: Int = 60): List<Station> =
+        buscar(nombre = query, idioma = idioma, limit = limit)
 
     /** Filtra por género/etiqueta (rock, jazz, noticias...). */
-    suspend fun byTag(tag: String, limit: Int = 60): List<Station> =
-        get("$BASE/json/stations/bytag/${enc(tag)}?limit=$limit&hidebroken=true&order=clickcount&reverse=true")
+    suspend fun byTag(tag: String, idioma: String? = null, limit: Int = 60): List<Station> =
+        buscar(etiqueta = tag, idioma = idioma, limit = limit)
 
     /**
      * Avisa al directorio de que se sintonizó una emisora. Es como Radio Browser

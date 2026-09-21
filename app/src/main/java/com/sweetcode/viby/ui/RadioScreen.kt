@@ -133,6 +133,32 @@ fun RadioScreen(
 
             Spacer(Modifier.height(12.dp))
 
+            // Idioma e idioma son dos ejes distintos (dónde busco / qué busco), así que
+            // esta fila va deliberadamente más ligera que los chips de género: sin
+            // relleno ni borde, solo texto. Tocar un género no debe borrar el idioma.
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 2.dp),
+                horizontalArrangement = Arrangement.spacedBy(18.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                opcionesIdioma().forEach { opcion ->
+                    val activa = state.idioma == opcion.codigo
+                    Text(
+                        text = opcion.etiqueta,
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = if (activa) FontWeight.Bold else FontWeight.Normal,
+                        color = if (activa) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { vm.onIdiomaClick(opcion.codigo) }
+                            .padding(horizontal = 4.dp, vertical = 6.dp),
+                    )
+                }
+            }
+
             LazyRow(
                 contentPadding = PaddingValues(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
