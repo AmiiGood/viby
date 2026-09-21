@@ -14,12 +14,16 @@ descubrir y descargar canciones nuevas desde la propia app.
 ## Qué hace
 
 - **Reproductor** con cola, aleatorio real, repetir, búsqueda y favoritos.
-- **Pantalla "Reproduciendo"** a pantalla completa, arrastrable (sube/baja siguiendo el dedo),
-  con carátula grande y fondo desenfocado.
-- **Navegación por pestañas**: Canciones · Álbumes · Artistas · Favoritos.
+- **Pantalla "Reproduciendo"** a pantalla completa, arrastrable (sube/baja siguiendo el dedo).
+  **El color sale de la carátula**: acento y fondo se extraen de la portada que suena y
+  cambian con cada canción, con transición suave. Incluye "A continuación" y acceso al
+  selector de salida de audio del sistema.
+- **Navegación por pestañas** en la cabecera: Canciones · Álbumes · Artistas · Favoritos.
+  La canción en curso se marca con barras de nivel animadas, que se congelan al pausar.
 - **Notificación y pantalla bloqueada** con carátula (Media3 / ExoPlayer).
 - **Ecualizador** integrado.
 - **Reanuda** donde te quedaste y recuerda aleatorio/repetir.
+- **Mini reproductor** con la carátula como disco que gira mientras suena y se detiene al pausar.
 - **Descargas** integradas (NewPipeExtractor): busca, escucha un preview, descarga a
   `Artista/Álbum/Título.m4a` con tags ID3 + carátula (enriquecido con MusicBrainz),
   en segundo plano con notificación de progreso y sin duplicados.
@@ -33,7 +37,8 @@ descubrir y descargar canciones nuevas desde la propia app.
 ## Stack
 
 Kotlin · Jetpack Compose (Material 3) · Media3/ExoPlayer · Coil · Glance (widget) ·
-NewPipeExtractor · jaudiotagger · MusicBrainz · Radio Browser · minSdk 26 · targetSdk 36.
+Palette (color desde la carátula) · NewPipeExtractor · jaudiotagger · MusicBrainz ·
+Radio Browser · iTunes Search (carátulas de radio) · minSdk 26 · targetSdk 36.
 
 ## Compilar
 
