@@ -1,6 +1,5 @@
 package com.sweetcode.viby.ui.components
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -11,7 +10,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Pause
@@ -27,7 +25,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -50,22 +47,15 @@ fun MiniPlayer(
     onPlayPause: () -> Unit,
     onNext: (() -> Unit)? = null,
     artworkUrl: String? = null,
-    acento: Color = MaterialTheme.colorScheme.primary,
-    sobreAcento: Color = MaterialTheme.colorScheme.onPrimary,
     dragModifier: Modifier = Modifier,
 ) {
-    Surface(
-        color = Color.White.copy(alpha = 0.10f),
-        shape = RoundedCornerShape(18.dp),
-        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.09f)),
-        modifier = dragModifier.padding(horizontal = 12.dp, vertical = 6.dp),
-    ) {
+    Surface(color = MaterialTheme.colorScheme.surface, tonalElevation = 3.dp, modifier = dragModifier) {
         Column(modifier = Modifier.clickable(onClick = onExpand)) {
             if (progress != null) LinearProgressIndicator(
                 progress = { progress.coerceIn(0f, 1f) },
                 modifier = Modifier.fillMaxWidth().height(2.dp),
-                color = acento,
-                trackColor = Color.White.copy(alpha = 0.12f),
+                color = MaterialTheme.colorScheme.primary,
+                trackColor = MaterialTheme.colorScheme.surfaceVariant,
             )
             Row(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 12.dp),
@@ -89,15 +79,12 @@ fun MiniPlayer(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                Surface(shape = CircleShape, color = acento, modifier = Modifier.size(38.dp)) {
-                    IconButton(onClick = onPlayPause) {
-                        Icon(
-                            imageVector = if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                            contentDescription = if (isPlaying) "Pausar" else "Reproducir",
-                            tint = sobreAcento,
-                            modifier = Modifier.size(20.dp),
-                        )
-                    }
+                IconButton(onClick = onPlayPause) {
+                    Icon(
+                        imageVector = if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                        contentDescription = if (isPlaying) "Pausar" else "Reproducir",
+                        tint = MaterialTheme.colorScheme.onSurface,
+                    )
                 }
                 if (onNext != null) {
                     IconButton(onClick = onNext) {
