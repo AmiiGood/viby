@@ -52,11 +52,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.media3.common.Player
 import com.sweetcode.viby.model.Song
 import coil.compose.AsyncImage
 import com.sweetcode.viby.ui.components.AlbumArt
 import com.sweetcode.viby.ui.components.AudioCover
+import com.sweetcode.viby.ui.theme.rememberVibyPalette
 
 @Composable
 fun NowPlayingScreen(
@@ -79,26 +81,20 @@ fun NowPlayingScreen(
     val artModel: Any = state.artworkUri?.takeIf { state.currentStation != null }
         ?: AudioCover(song.uri)
 
+    // El color sale de la carátula: es la idea entera de esta dirección.
+    val paleta = rememberVibyPalette(songUri = song.uri, artworkUri = state.artworkUri)
+
     Box(
         Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-    ) {
-        // Fondo desenfocado con la carátula
-        AsyncImage(
-            model = artModel,
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxSize().blur(60.dp),
-        )
-        // Velo oscuro para legibilidad
-        Box(
-            Modifier.fillMaxSize().background(
+            .background(
                 Brush.verticalGradient(
-                    listOf(Color.Black.copy(alpha = 0.45f), Color.Black.copy(alpha = 0.85f))
+                    0f to paleta.fondoInicio,
+                    0.45f to paleta.fondoMedio,
+                    1f to paleta.fondoFin,
                 )
             )
-        )
+    ) {
 
         Column(
             modifier = Modifier.fillMaxSize().statusBarsPadding().padding(24.dp),
@@ -116,13 +112,23 @@ fun NowPlayingScreen(
                         tint = Color.White,
                     )
                 }
-                Text(
-                    text = "Reproduciendo",
-                    modifier = Modifier.weight(1f),
-                    textAlign = TextAlign.Center,
-                    color = Color.White,
-                    fontWeight = FontWeight.SemiBold,
-                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "REPRODUCIENDO DESDE",
+                        fontSize = 10.sp,
+                        letterSpacing = 1.3.sp,
+                        color = Color.White.copy(alpha = 0.5f),
+                        fontWeight = FontWeight.Medium,
+                    )
+                    Text(
+                        text = state.currentStation?.name ?: song.album.ifBlank { "Tu biblioteca" },
+                        fontSize = 13.sp,
+                        color = Color.White.copy(alpha = 0.92f),
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
                 IconButton(onClick = onToggleFavorite) {
                     Icon(
                         imageVector = if (isFavorite) Icons.Rounded.Favorite
@@ -171,35 +177,38 @@ fun NowPlayingScreen(
             // Título / artista
             Text(
                 text = song.title,
-                style = MaterialTheme.typography.headlineSmall,
+                fontSize = 30.sp,
+                lineHeight = 34.sp,
+                letterSpacing = (-0.6).sp,
                 fontWeight = FontWeight.Bold,
                 color = Color.White,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.fillMaxWidth(),
-                textAlign = TextAlign.Center,
+                textAlign = TextAlign.Start,
             )
             Spacer(Modifier.height(6.dp))
             Text(
                 text = song.artist,
                 style = MaterialTheme.typography.bodyLarge,
-                color = Color.White.copy(alpha = 0.7f),
+                color = Color.White.copy(alpha = 0.6f),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.fillMaxWidth(),
-                textAlign = TextAlign.Center,
+                textAlign = TextAlign.Start,
             )
 
             Spacer(Modifier.height(20.dp))
 
             // Un stream en vivo no tiene duracion ni permite buscar dentro.
             if (state.currentStation != null) {
-                LiveIndicator()
+                LiveIndicator(paleta.acento)
             } else {
                 // Barra de progreso arrastrable
                 SeekBar(
                     positionMs = state.positionMs,
                     durationMs = state.durationMs,
+                    acento = paleta.acento,
                     onSeek = onSeek,
                 )
             }
@@ -216,8 +225,8 @@ fun NowPlayingScreen(
                     Icon(
                         Icons.Rounded.Shuffle,
                         contentDescription = "Aleatorio",
-                        tint = if (state.shuffleEnabled) MaterialTheme.colorScheme.primary
-                        else Color.White.copy(alpha = 0.7f),
+                        tint = if (state.shuffleEnabled) paleta.acento
+                        else Color.White.copy(alpha = 0.45f),
                     )
                 }
                 IconButton(onClick = onPrevious) {
@@ -231,15 +240,15 @@ fun NowPlayingScreen(
                 // Botón play/pausa grande
                 Surface(
                     shape = CircleShape,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(72.dp),
+                    color = paleta.acento,
+                    modifier = Modifier.size(76.dp),
                 ) {
                     IconButton(onClick = onPlayPause) {
                         Icon(
                             imageVector = if (state.isPlaying) Icons.Rounded.Pause
                             else Icons.Rounded.PlayArrow,
                             contentDescription = if (state.isPlaying) "Pausar" else "Reproducir",
-                            tint = MaterialTheme.colorScheme.onPrimary,
+                            tint = paleta.sobreAcento,
                             modifier = Modifier.size(40.dp),
                         )
                     }
@@ -258,7 +267,7 @@ fun NowPlayingScreen(
                             Icons.Rounded.RepeatOne else Icons.Rounded.Repeat,
                         contentDescription = "Repetir",
                         tint = if (state.repeatMode == Player.REPEAT_MODE_OFF)
-                            Color.White.copy(alpha = 0.7f) else MaterialTheme.colorScheme.primary,
+                            Color.White.copy(alpha = 0.45f) else paleta.acento,
                     )
                 }
             }
@@ -269,7 +278,7 @@ fun NowPlayingScreen(
 }
 
 @Composable
-private fun SeekBar(positionMs: Long, durationMs: Long, onSeek: (Long) -> Unit) {
+private fun SeekBar(positionMs: Long, durationMs: Long, acento: Color, onSeek: (Long) -> Unit) {
     var scrubbing by remember { mutableStateOf(false) }
     var scrubValue by remember { mutableStateOf(0f) }
 
@@ -289,9 +298,9 @@ private fun SeekBar(positionMs: Long, durationMs: Long, onSeek: (Long) -> Unit) 
                 scrubbing = false
             },
             colors = SliderDefaults.colors(
-                thumbColor = MaterialTheme.colorScheme.primary,
-                activeTrackColor = MaterialTheme.colorScheme.primary,
-                inactiveTrackColor = Color.White.copy(alpha = 0.25f),
+                thumbColor = Color.White,
+                activeTrackColor = acento,
+                inactiveTrackColor = Color.White.copy(alpha = 0.18f),
             ),
         )
         Row(
@@ -315,7 +324,7 @@ private fun SeekBar(positionMs: Long, durationMs: Long, onSeek: (Long) -> Unit) 
 
 /** Sustituye a la barra de progreso cuando lo que suena es una emisora. */
 @Composable
-private fun LiveIndicator() {
+private fun LiveIndicator(acento: Color) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.Center,
@@ -325,14 +334,14 @@ private fun LiveIndicator() {
             Modifier
                 .size(8.dp)
                 .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.primary)
+                .background(acento)
         )
         Spacer(Modifier.width(8.dp))
         Text(
             text = "EN VIVO",
             style = MaterialTheme.typography.labelMedium,
             fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary,
+            color = acento,
         )
     }
 }
