@@ -227,6 +227,7 @@ fun HomeScreen(
                             onExpand = { settle(true) },
                             onPlayPause = vm::togglePlay,
                             onNext = vm::next,
+                            onPrevious = vm::previous,
                             dragModifier = dragModifier,
                         )
                     }
