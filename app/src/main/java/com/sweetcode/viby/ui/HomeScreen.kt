@@ -275,7 +275,7 @@ fun HomeScreen(
                                 }
                             }
                             val onPlay = remember(displayed) { fn@{ i: Int -> vm.play(displayed, i) } }
-                            SongList(displayed, state.currentSong?.id, favorites, onPlay, onToggleFavorite)
+                            SongList(displayed, state.currentSong?.id, favorites, paleta.acento, onPlay, onToggleFavorite)
                         }
 
                         Tab.ALBUMS -> AlbumList(songs, onOpenAlbum)
@@ -288,7 +288,7 @@ fun HomeScreen(
                                 EmptyHint("Aún no tienes favoritos.\nToca el ❤ en una canción para agregarla.")
                             } else {
                                 val onPlayFav = remember(favSongs) { fn@{ i: Int -> vm.play(favSongs, i) } }
-                                SongList(favSongs, state.currentSong?.id, favorites, onPlayFav, onToggleFavorite)
+                                SongList(favSongs, state.currentSong?.id, favorites, paleta.acento, onPlayFav, onToggleFavorite)
                             }
                         }
                     }
@@ -330,6 +330,7 @@ private fun SongList(
     songs: List<Song>,
     currentId: String?,
     favorites: Set<String>,
+    acento: Color,
     onPlay: (Int) -> Unit,
     onToggleFavorite: (String) -> Unit,
 ) {
@@ -341,6 +342,7 @@ private fun SongList(
                 isFavorite = song.id in favorites,
                 onClick = { onPlay(index) },
                 onToggleFavorite = { onToggleFavorite(song.id) },
+                acento = acento,
             )
         }
     }
