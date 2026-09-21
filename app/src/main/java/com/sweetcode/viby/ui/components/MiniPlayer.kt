@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -84,7 +85,10 @@ fun MiniPlayer(
         color = MaterialTheme.colorScheme.surface,
         shape = RoundedCornerShape(20.dp),
         tonalElevation = 4.dp,
-        modifier = dragModifier.padding(horizontal = 10.dp, vertical = 6.dp),
+        modifier = dragModifier
+            // Sin esto la píldora de gestos del sistema se monta sobre la tarjeta.
+            .navigationBarsPadding()
+            .padding(horizontal = 10.dp, vertical = 6.dp),
     ) {
         Row(
             modifier = Modifier

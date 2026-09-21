@@ -318,7 +318,7 @@ private fun SongList(
     onPlay: (Int) -> Unit,
     onToggleFavorite: (String) -> Unit,
 ) {
-    LazyColumn(contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)) {
+    LazyColumn(contentPadding = PaddingValues(vertical = 8.dp)) {
         itemsIndexed(songs, key = { _, song -> song.id }) { index, song ->
             SongRow(
                 song = song,

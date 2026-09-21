@@ -54,6 +54,7 @@ import coil.compose.AsyncImage
 import com.sweetcode.viby.model.Song
 import com.sweetcode.viby.model.Station
 import com.sweetcode.viby.ui.components.MiniPlayer
+import com.sweetcode.viby.ui.components.PlayingBars
 import com.sweetcode.viby.ui.components.VibyTopBar
 
 /**
@@ -249,13 +250,13 @@ private fun StationRow(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onPlay)
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
             modifier = Modifier
-                .size(48.dp)
-                .clip(RoundedCornerShape(8.dp))
+                .size(54.dp)
+                .clip(RoundedCornerShape(10.dp))
                 .background(MaterialTheme.colorScheme.surfaceVariant),
             contentAlignment = Alignment.Center,
         ) {
@@ -275,7 +276,7 @@ private fun StationRow(
             }
         }
 
-        Spacer(Modifier.width(12.dp))
+        Spacer(Modifier.width(14.dp))
 
         Column(Modifier.weight(1f)) {
             Text(
@@ -299,13 +300,9 @@ private fun StationRow(
         }
 
         if (isPlaying) {
-            Icon(
-                Icons.Rounded.GraphicEq,
-                contentDescription = "Sonando",
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(20.dp),
-            )
-            Spacer(Modifier.width(4.dp))
+            // La misma olita que en Biblioteca: un solo lenguaje para "esto suena".
+            PlayingBars(color = MaterialTheme.colorScheme.primary)
+            Spacer(Modifier.width(10.dp))
         }
 
         IconButton(onClick = onToggleFavorite) {
