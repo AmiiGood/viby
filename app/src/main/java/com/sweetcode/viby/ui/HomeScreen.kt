@@ -65,6 +65,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalFocusManager
@@ -77,7 +79,9 @@ import com.sweetcode.viby.model.Song
 import com.sweetcode.viby.ui.components.AlbumArt
 import com.sweetcode.viby.ui.components.MiniPlayer
 import com.sweetcode.viby.ui.components.SongRow
+import com.sweetcode.viby.ui.components.VibyTabs
 import com.sweetcode.viby.ui.components.VibyTopBar
+import com.sweetcode.viby.ui.theme.rememberVibyPalette
 import kotlinx.coroutines.launch
 
 private enum class Tab(val label: String, val icon: ImageVector) {
@@ -105,6 +109,11 @@ fun HomeScreen(
 
     var tabIndex by rememberSaveable { mutableStateOf(0) }
     val tab = Tab.entries[tabIndex]
+    // El fondo y los acentos salen de la carátula que está sonando.
+    val paleta = rememberVibyPalette(
+        songUri = state.currentSong?.uri,
+        artworkUri = state.artworkUri,
+    )
     var searching by rememberSaveable { mutableStateOf(false) }
     var query by rememberSaveable { mutableStateOf("") }
     // Referencia estable para que la lista no se recomponga con cada tick de progreso (0.5s).
@@ -162,9 +171,17 @@ fun HomeScreen(
 
         // ===== Pantalla principal (pestañas) =====
         Scaffold(
-            containerColor = MaterialTheme.colorScheme.background,
+            modifier = Modifier.background(
+                Brush.verticalGradient(
+                    0f to paleta.fondoInicio,
+                    0.35f to paleta.fondoMedio,
+                    1f to paleta.fondoFin,
+                )
+            ),
+            containerColor = Color.Transparent,
             topBar = {
-                VibyTopBar(
+                Column {
+                    VibyTopBar(
                     title = {
                         if (tab == Tab.SONGS && searching) {
                             SearchField(query = query, onQueryChange = { query = it })
@@ -199,7 +216,15 @@ fun HomeScreen(
                             }
                         }
                     },
-                )
+                    )
+                    VibyTabs(
+                        labels = Tab.entries.map { it.label },
+                        selected = tabIndex,
+                        acento = paleta.acento,
+                        onSelect = { tabIndex = it },
+                        modifier = Modifier.padding(bottom = 8.dp),
+                    )
+                }
             },
             bottomBar = {
                 Column {
@@ -214,28 +239,13 @@ fun HomeScreen(
                             // servicio resuelve su portada (o su logo) a un fichero.
                             artworkUrl = state.artworkUri?.takeIf { state.currentStation != null }
                                 ?.toString(),
+                            acento = paleta.acento,
+                            sobreAcento = paleta.sobreAcento,
                             onExpand = { settle(true) },
                             onPlayPause = vm::togglePlay,
                             onNext = vm::next,
                             dragModifier = dragModifier,
                         )
-                    }
-                    NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
-                        Tab.entries.forEach { t ->
-                            NavigationBarItem(
-                                selected = tab == t,
-                                onClick = { tabIndex = t.ordinal },
-                                icon = { Icon(t.icon, contentDescription = t.label) },
-                                label = { Text(t.label) },
-                                colors = NavigationBarItemDefaults.colors(
-                                    selectedIconColor = MaterialTheme.colorScheme.onPrimary,
-                                    indicatorColor = MaterialTheme.colorScheme.primary,
-                                    selectedTextColor = MaterialTheme.colorScheme.primary,
-                                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                ),
-                            )
-                        }
                     }
                 }
             },

@@ -43,6 +43,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -55,6 +57,7 @@ import com.sweetcode.viby.model.Song
 import com.sweetcode.viby.model.Station
 import com.sweetcode.viby.ui.components.MiniPlayer
 import com.sweetcode.viby.ui.components.VibyTopBar
+import com.sweetcode.viby.ui.theme.rememberVibyPalette
 
 /**
  * Catálogo de emisoras de radio por internet (Radio Browser).
@@ -77,6 +80,8 @@ fun RadioScreen(
     val vm: RadioViewModel = viewModel()
     val state by vm.state.collectAsStateWithLifecycle()
     val focusManager = LocalFocusManager.current
+    // Mismo criterio que en el resto: el color sale de lo que esté sonando.
+    val paleta = rememberVibyPalette(songUri = nowPlaying?.uri, artworkUri = artworkUri)
 
     val play: (Station) -> Unit = { station ->
         focusManager.clearFocus()
@@ -85,7 +90,14 @@ fun RadioScreen(
     }
 
     Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
+        modifier = Modifier.background(
+            Brush.verticalGradient(
+                0f to paleta.fondoInicio,
+                0.35f to paleta.fondoMedio,
+                1f to paleta.fondoFin,
+            )
+        ),
+        containerColor = Color.Transparent,
         topBar = {
             VibyTopBar(title = "Radio", onBack = onBack)
         },
@@ -98,6 +110,8 @@ fun RadioScreen(
                     isPlaying = isPlaying,
                     progress = null, // en vivo: no hay barra que llenar
                     artworkUrl = artworkUri?.toString() ?: playingStation.faviconUrl.takeIf { it.isNotBlank() },
+                    acento = paleta.acento,
+                    sobreAcento = paleta.sobreAcento,
                     onExpand = onBack, // el reproductor completo vive en la pantalla de inicio
                     onPlayPause = onPlayPause,
                     // Sin "siguiente": una emisora no tiene cola detras.
@@ -141,7 +155,10 @@ fun RadioScreen(
                         selected = state.genre == genre,
                         onClick = { vm.onGenreClick(genre) },
                         label = { Text(genre) },
-                        colors = FilterChipDefaults.filterChipColors(),
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = paleta.acento.copy(alpha = 0.18f),
+                            selectedLabelColor = paleta.acento,
+                        ),
                     )
                 }
             }
