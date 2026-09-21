@@ -1,6 +1,9 @@
 package com.sweetcode.viby.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,6 +13,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -47,10 +51,13 @@ import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.media3.common.Player
@@ -59,6 +66,7 @@ import coil.compose.AsyncImage
 import com.sweetcode.viby.ui.components.AlbumArt
 import com.sweetcode.viby.ui.components.AudioCover
 import com.sweetcode.viby.ui.theme.rememberVibyPalette
+import kotlin.math.roundToInt
 
 @Composable
 fun NowPlayingScreen(
@@ -75,6 +83,7 @@ fun NowPlayingScreen(
     onSeek: (Long) -> Unit,
     onToggleShuffle: () -> Unit,
     onCycleRepeat: () -> Unit,
+    nextSong: Song? = null,
 ) {
     // Una emisora no tiene caratula embebida que extraer de su URL: la portada
     // la resuelve el servicio y llega ya como fichero en artworkUri.
@@ -112,32 +121,18 @@ fun NowPlayingScreen(
                         tint = Color.White,
                     )
                 }
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "REPRODUCIENDO DESDE",
-                        fontSize = 10.sp,
-                        letterSpacing = 1.3.sp,
-                        color = Color.White.copy(alpha = 0.5f),
-                        fontWeight = FontWeight.Medium,
-                    )
-                    Text(
-                        text = state.currentStation?.name ?: song.album.ifBlank { "Tu biblioteca" },
-                        fontSize = 13.sp,
-                        color = Color.White.copy(alpha = 0.92f),
-                        fontWeight = FontWeight.Medium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                IconButton(onClick = onToggleFavorite) {
-                    Icon(
-                        imageVector = if (isFavorite) Icons.Rounded.Favorite
-                        else Icons.Rounded.FavoriteBorder,
-                        contentDescription = if (isFavorite) "Quitar de favoritos"
-                        else "Agregar a favoritos",
-                        tint = if (isFavorite) MaterialTheme.colorScheme.tertiary else Color.White,
-                    )
-                }
+                Text(
+                    text = (state.currentStation?.name ?: song.album.ifBlank { "Tu biblioteca" })
+                        .uppercase(),
+                    modifier = Modifier.weight(1f),
+                    textAlign = TextAlign.Center,
+                    fontSize = 10.sp,
+                    letterSpacing = 1.3.sp,
+                    color = Color.White.copy(alpha = 0.5f),
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
                 IconButton(onClick = onOpenEqualizer) {
                     Icon(
                         Icons.Rounded.Equalizer,
@@ -158,7 +153,7 @@ fun NowPlayingScreen(
 
             // Carátula grande
             val artModifier = Modifier
-                .fillMaxWidth(0.82f)
+                .fillMaxWidth()
                 .aspectRatio(1f)
                 .clip(RoundedCornerShape(20.dp))
             if (state.currentStation != null) {
@@ -174,7 +169,8 @@ fun NowPlayingScreen(
 
             Spacer(Modifier.height(32.dp))
 
-            // Título / artista
+            // Título / artista, con el favorito a su derecha
+            Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 text = song.title,
                 fontSize = 30.sp,
@@ -184,10 +180,21 @@ fun NowPlayingScreen(
                 color = Color.White,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.weight(1f),
                 textAlign = TextAlign.Start,
             )
-            Spacer(Modifier.height(6.dp))
+            IconButton(onClick = onToggleFavorite) {
+                Icon(
+                    imageVector = if (isFavorite) Icons.Rounded.Favorite
+                    else Icons.Rounded.FavoriteBorder,
+                    contentDescription = if (isFavorite) "Quitar de favoritos"
+                    else "Agregar a favoritos",
+                    tint = if (isFavorite) MaterialTheme.colorScheme.tertiary
+                    else Color.White.copy(alpha = 0.55f),
+                )
+            }
+            }
+            Spacer(Modifier.height(2.dp))
             Text(
                 text = song.artist,
                 style = MaterialTheme.typography.bodyLarge,
@@ -273,6 +280,44 @@ fun NowPlayingScreen(
             }
 
             Spacer(Modifier.weight(1f))
+
+            // Lo que viene después. Una emisora no tiene cola, así que solo sale
+            // cuando de verdad hay una canción siguiente.
+            if (nextSong != null && state.currentStation == null) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(18.dp))
+                        .background(Color.White.copy(alpha = 0.08f))
+                        .clickable(onClick = onOpenQueue)
+                        .padding(10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    AlbumArt(
+                        uri = nextSong.uri,
+                        modifier = Modifier.size(38.dp).clip(RoundedCornerShape(9.dp)),
+                    )
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            text = "A CONTINUACIÓN",
+                            fontSize = 9.sp,
+                            letterSpacing = 1.2.sp,
+                            color = Color.White.copy(alpha = 0.45f),
+                            fontWeight = FontWeight.Medium,
+                        )
+                        Text(
+                            text = "${nextSong.title} · ${nextSong.artist}",
+                            fontSize = 13.sp,
+                            color = Color.White.copy(alpha = 0.9f),
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+            }
         }
     }
 }
@@ -281,42 +326,77 @@ fun NowPlayingScreen(
 private fun SeekBar(positionMs: Long, durationMs: Long, acento: Color, onSeek: (Long) -> Unit) {
     var scrubbing by remember { mutableStateOf(false) }
     var scrubValue by remember { mutableStateOf(0f) }
+    var anchoPx by remember { mutableStateOf(1f) }
 
     val duration = durationMs.coerceAtLeast(1L)
-    val sliderValue = if (scrubbing) scrubValue
+    val fraccion = if (scrubbing) scrubValue
     else (positionMs.toFloat() / duration).coerceIn(0f, 1f)
 
     Column(Modifier.fillMaxWidth()) {
-        Slider(
-            value = sliderValue,
-            onValueChange = {
-                scrubbing = true
-                scrubValue = it
-            },
-            onValueChangeFinished = {
-                onSeek((scrubValue * duration).toLong())
-                scrubbing = false
-            },
-            colors = SliderDefaults.colors(
-                thumbColor = Color.White,
-                activeTrackColor = acento,
-                inactiveTrackColor = Color.White.copy(alpha = 0.18f),
-            ),
-        )
+        // Línea con punto, dibujada a mano: el Slider de Material trae su propio
+        // pulgar en forma de barra y marcas de tope que no son lo que pide el diseño.
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(20.dp)
+                .onSizeChanged { anchoPx = it.width.toFloat().coerceAtLeast(1f) }
+                .pointerInput(Unit) {
+                    detectHorizontalDragGestures(
+                        onDragStart = { offset ->
+                            scrubbing = true
+                            scrubValue = (offset.x / anchoPx).coerceIn(0f, 1f)
+                        },
+                        onDragEnd = {
+                            onSeek((scrubValue * duration).toLong())
+                            scrubbing = false
+                        },
+                        onDragCancel = { scrubbing = false },
+                    ) { change, _ ->
+                        scrubValue = (change.position.x / anchoPx).coerceIn(0f, 1f)
+                    }
+                }
+                .pointerInput(Unit) {
+                    detectTapGestures { offset ->
+                        onSeek(((offset.x / anchoPx).coerceIn(0f, 1f) * duration).toLong())
+                    }
+                },
+            contentAlignment = Alignment.CenterStart,
+        ) {
+            Box(
+                Modifier.fillMaxWidth().height(3.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(Color.White.copy(alpha = 0.18f))
+            )
+            Box(
+                Modifier.fillMaxWidth(fraccion).height(3.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(acento)
+            )
+            Box(
+                Modifier
+                    .offset {
+                        IntOffset((fraccion * anchoPx - 6.dp.toPx()).roundToInt(), 0)
+                    }
+                    .size(12.dp)
+                    .clip(CircleShape)
+                    .background(Color.White)
+            )
+        }
+        Spacer(Modifier.height(6.dp))
         Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+            modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             val shownPosition = if (scrubbing) (scrubValue * duration).toLong() else positionMs
             Text(
                 formatDuration(shownPosition),
                 style = MaterialTheme.typography.labelMedium,
-                color = Color.White.copy(alpha = 0.7f),
+                color = Color.White.copy(alpha = 0.6f),
             )
             Text(
                 formatDuration(durationMs),
                 style = MaterialTheme.typography.labelMedium,
-                color = Color.White.copy(alpha = 0.7f),
+                color = Color.White.copy(alpha = 0.35f),
             )
         }
     }

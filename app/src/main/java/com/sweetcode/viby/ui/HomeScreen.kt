@@ -102,6 +102,7 @@ fun HomeScreen(
     val songs by vm.songs.collectAsStateWithLifecycle()
     val state by vm.uiState.collectAsStateWithLifecycle()
     val favorites by vm.favorites.collectAsStateWithLifecycle()
+    val queue by vm.queue.collectAsStateWithLifecycle()
 
     var tabIndex by rememberSaveable { mutableStateOf(0) }
     val tab = Tab.entries[tabIndex]
@@ -309,6 +310,7 @@ fun HomeScreen(
                     onSeek = vm::seekTo,
                     onToggleShuffle = vm::toggleShuffle,
                     onCycleRepeat = vm::cycleRepeat,
+                    nextSong = queue.getOrNull(state.currentIndex + 1),
                 )
             }
         }
