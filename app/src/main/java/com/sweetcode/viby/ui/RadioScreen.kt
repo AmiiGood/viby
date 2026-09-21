@@ -54,7 +54,9 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
+import com.sweetcode.viby.model.Song
 import com.sweetcode.viby.model.Station
+import com.sweetcode.viby.ui.components.MiniPlayer
 
 /**
  * Catálogo de emisoras de radio por internet (Radio Browser).
@@ -67,8 +69,12 @@ import com.sweetcode.viby.model.Station
 fun RadioScreen(
     onBack: () -> Unit,
     onPlay: (Station) -> Unit,
-    playingStationId: String?,
+    playingStation: Station?,
+    nowPlaying: Song?,
+    isPlaying: Boolean,
+    onPlayPause: () -> Unit,
 ) {
+    val playingStationId = playingStation?.id
     val vm: RadioViewModel = viewModel()
     val state by vm.state.collectAsStateWithLifecycle()
     val focusManager = LocalFocusManager.current
@@ -95,6 +101,21 @@ fun RadioScreen(
                     navigationIconContentColor = MaterialTheme.colorScheme.onBackground,
                 ),
             )
+        },
+        bottomBar = {
+            // Sin esto, al quedarte navegando el catalogo pierdes de vista que
+            // hay algo sonando y no tienes forma de pararlo sin volver atras.
+            if (playingStation != null && nowPlaying != null) {
+                MiniPlayer(
+                    song = nowPlaying,
+                    isPlaying = isPlaying,
+                    progress = null, // en vivo: no hay barra que llenar
+                    artworkUrl = playingStation.faviconUrl.takeIf { it.isNotBlank() },
+                    onExpand = onBack, // el reproductor completo vive en la pantalla de inicio
+                    onPlayPause = onPlayPause,
+                    // Sin "siguiente": una emisora no tiene cola detras.
+                )
+            }
         },
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {

@@ -82,6 +82,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.sweetcode.viby.model.Song
 import com.sweetcode.viby.ui.components.AlbumArt
+import com.sweetcode.viby.ui.components.MiniPlayer
 import com.sweetcode.viby.ui.components.SongRow
 import kotlinx.coroutines.launch
 
@@ -219,6 +220,9 @@ fun HomeScreen(
                             // null = sin barra: emisora en vivo o duracion aun desconocida.
                             progress = if (state.durationMs > 0)
                                 state.positionMs.toFloat() / state.durationMs else null,
+                            // Una emisora no tiene caratula embebida que extraer: su logo
+                            // viene del directorio.
+                            artworkUrl = state.currentStation?.faviconUrl?.takeIf { it.isNotBlank() },
                             onExpand = { settle(true) },
                             onPlayPause = vm::togglePlay,
                             onNext = vm::next,
@@ -424,53 +428,6 @@ private fun SearchField(query: String, onQueryChange: (String) -> Unit) {
             unfocusedIndicatorColor = MaterialTheme.colorScheme.surfaceVariant,
         ),
     )
-}
-
-@Composable
-private fun MiniPlayer(
-    song: Song,
-    isPlaying: Boolean,
-    progress: Float?,
-    onExpand: () -> Unit,
-    onPlayPause: () -> Unit,
-    onNext: () -> Unit,
-    dragModifier: Modifier,
-) {
-    Surface(color = MaterialTheme.colorScheme.surface, tonalElevation = 3.dp, modifier = dragModifier) {
-        Column(modifier = Modifier.clickable(onClick = onExpand)) {
-            if (progress != null) LinearProgressIndicator(
-                progress = { progress.coerceIn(0f, 1f) },
-                modifier = Modifier.fillMaxWidth().height(2.dp),
-                color = MaterialTheme.colorScheme.primary,
-                trackColor = MaterialTheme.colorScheme.surfaceVariant,
-            )
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                AlbumArt(uri = song.uri, modifier = Modifier.size(58.dp).clip(RoundedCornerShape(10.dp)))
-                Spacer(Modifier.width(14.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(song.title, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                        fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
-                    Text(song.artist, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                IconButton(onClick = onPlayPause) {
-                    Icon(
-                        imageVector = if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                        contentDescription = if (isPlaying) "Pausar" else "Reproducir",
-                        tint = MaterialTheme.colorScheme.onSurface,
-                    )
-                }
-                IconButton(onClick = onNext) {
-                    Icon(Icons.Rounded.SkipNext, contentDescription = "Siguiente",
-                        tint = MaterialTheme.colorScheme.onSurface)
-                }
-            }
-        }
-    }
 }
 
 @Composable

@@ -91,6 +91,7 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
             rebuildQueue()
             persistPlayback()
         }
+        override fun onMediaMetadataChanged(mediaMetadata: MediaMetadata) = syncFromPlayer()
         override fun onShuffleModeEnabledChanged(enabled: Boolean) = syncFromPlayer()
         override fun onRepeatModeChanged(repeatMode: Int) = syncFromPlayer()
     }
@@ -279,7 +280,12 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
         // borrarlo ahi apagaria el modo radio nada mas encenderlo. Se limpia
         // explicitamente cuando arranca la biblioteca.
         val station = playingStation?.takeIf { it.id == c.currentMediaItem?.mediaId }
-        val current = station?.asSong()
+        // Si la emisora manda metadatos ICY, el titulo ya no es su nombre sino la
+        // cancion que esta sonando; el servicio lo vuelca en el MediaItem.
+        val liveTitle = station?.let { s ->
+            c.mediaMetadata.title?.toString()?.takeIf { it.isNotBlank() && it != s.name }
+        }
+        val current = station?.asSong(liveTitle)
             ?: _queue.value.getOrNull(c.currentMediaItemIndex)
             ?: songById[c.currentMediaItem?.mediaId]
         _uiState.value = _uiState.value.copy(
@@ -393,11 +399,13 @@ private fun Song.toMediaItem(): MediaItem =
  * Un stream no tiene duracion ni caratula embebida: se representa como [Song] con
  * durationMs = 0, que es justo la senal que la UI ya usa para no dibujar progreso.
  */
-private fun Station.asSong(): Song = Song(
+private fun Station.asSong(liveTitle: String? = null): Song = Song(
     id = id,
     uri = Uri.parse(streamUrl),
-    title = name,
-    artist = subtitle,
+    // Con ICY manda la cancion y la emisora baja a la segunda linea; sin ICY,
+    // la emisora es lo unico que se sabe.
+    title = liveTitle ?: name,
+    artist = if (liveTitle != null) name else subtitle,
     album = "",
     durationMs = 0L,
 )

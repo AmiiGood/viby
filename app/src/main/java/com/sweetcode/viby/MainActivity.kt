@@ -82,7 +82,10 @@ private fun VibyApp() {
             RadioScreen(
                 onBack = { nav.popBackStack() },
                 onPlay = vm::playStation,
-                playingStationId = state.currentStation?.id,
+                playingStation = state.currentStation,
+                nowPlaying = state.currentSong,
+                isPlaying = state.isPlaying,
+                onPlayPause = vm::togglePlay,
             )
         }
         composable("discover") {

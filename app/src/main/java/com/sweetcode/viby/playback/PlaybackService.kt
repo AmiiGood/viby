@@ -5,12 +5,15 @@ import android.content.Context
 import android.content.Intent
 import android.media.AudioManager
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MediaMetadata
+import androidx.media3.common.Metadata
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
+import androidx.media3.extractor.metadata.icy.IcyInfo
 import com.sweetcode.viby.MainActivity
 import com.sweetcode.viby.data.coverThumbFile
 import com.sweetcode.viby.widget.updateVibyWidget
@@ -34,6 +37,11 @@ class PlaybackService : MediaSessionService() {
 
     // Reintentos de reconexion del stream en curso; se ponen a cero al volver a sonar.
     private var streamRetries = 0
+
+    // Nombre de la emisora en curso: los metadatos ICY pisan el titulo, asi que
+    // hay que guardarlo antes de la primera actualizacion para no perderlo.
+    private var stationName: String? = null
+    private var currentItemId: String? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -62,14 +70,55 @@ class PlaybackService : MediaSessionService() {
 
     private val widgetListener = object : Player.Listener {
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+            // Solo al cambiar de pista de verdad: actualizar los metadatos ICY
+            // tambien pasa por aqui, y ahi el titulo ya es el de la cancion.
+            val id = mediaItem?.mediaId
+            if (id != currentItemId) {
+                currentItemId = id
+                stationName = mediaItem?.mediaMetadata?.title?.toString()
+            }
             refreshWidget()
         }
+        override fun onMetadata(metadata: Metadata) = applyIcyMetadata(metadata)
         override fun onIsPlayingChanged(isPlaying: Boolean) {
             if (isPlaying) streamRetries = 0
             refreshWidget()
         }
         override fun onPlaybackStateChanged(playbackState: Int) = refreshWidget()
         override fun onPlayerError(error: PlaybackException) = reconnectStream()
+    }
+
+    /**
+     * Las emisoras Icecast mandan dentro del propio stream el titulo de lo que
+     * suena (metadatos ICY). Se vuelca en el MediaItem para que lo vean la
+     * notificacion, la pantalla bloqueada, el widget y la app.
+     *
+     * replaceMediaItem con la MISMA uri no reinicia la reproduccion: ExoPlayer
+     * reutiliza la fuente y solo intercambia los metadatos. Con setMediaItem
+     * volveria a conectar y se oiria el corte.
+     */
+    private fun applyIcyMetadata(metadata: Metadata) {
+        val player = mediaSession?.player ?: return
+        val item = player.currentMediaItem ?: return
+        if (item.localConfiguration?.uri?.toString()?.startsWith("http") != true) return
+
+        val title = (0 until metadata.length())
+            .mapNotNull { metadata.get(it) as? IcyInfo }
+            .firstNotNullOfOrNull { it.title?.trim()?.ifBlank { null } }
+            ?: return
+        // Muchas emisoras reenvian el mismo titulo cada pocos segundos.
+        if (title == item.mediaMetadata.title?.toString()) return
+
+        val station = stationName ?: item.mediaMetadata.title?.toString()
+        val updated = item.buildUpon()
+            .setMediaMetadata(
+                item.mediaMetadata.buildUpon()
+                    .setTitle(title)
+                    .setArtist(station) // la emisora pasa a segunda linea
+                    .build()
+            )
+            .build()
+        runCatching { player.replaceMediaItem(player.currentMediaItemIndex, updated) }
     }
 
     /**
