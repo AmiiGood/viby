@@ -56,7 +56,7 @@ class DownloadViewModel(app: Application) : AndroidViewModel(app) {
             _state.update {
                 result.fold(
                     onSuccess = { list -> it.copy(isSearching = false, results = list) },
-                    onFailure = { e -> it.copy(isSearching = false, error = e.message ?: "Error al buscar") },
+                    onFailure = { e -> it.copy(isSearching = false, error = mensajeDeError(e, "Error al buscar")) },
                 )
             }
         }
@@ -89,7 +89,7 @@ class DownloadViewModel(app: Application) : AndroidViewModel(app) {
                             error = if (list.isEmpty()) "No se encontraron recomendaciones nuevas." else null,
                         )
                     },
-                    onFailure = { e -> it.copy(isSearching = false, error = e.message ?: "Error") },
+                    onFailure = { e -> it.copy(isSearching = false, error = mensajeDeError(e, "Error")) },
                 )
             }
         }
@@ -149,4 +149,25 @@ class DownloadViewModel(app: Application) : AndroidViewModel(app) {
         previewPlayer = null
         super.onCleared()
     }
+}
+
+/**
+ * Traduce el fallo a algo accionable.
+ *
+ * Antes se mostraba el mensaje de la excepción tal cual, y eso deja al usuario con
+ * cosas como "SSL handshake aborted: I/O error during system call", que no le dice
+ * qué hacer. Los fallos de red se distinguen porque son los únicos que el usuario
+ * puede resolver por su cuenta: cambiando de red.
+ */
+private fun mensajeDeError(e: Throwable, porDefecto: String): String = when {
+    e is java.net.UnknownHostException ->
+        "Sin conexión. Revisa que tengas internet."
+    e is java.net.SocketTimeoutException ->
+        "La conexión tardó demasiado. Inténtalo otra vez."
+    e is javax.net.ssl.SSLException || e is java.net.SocketException ->
+        "No se pudo conectar con el servidor. Puede que tu red esté bloqueando " +
+            "la conexión: prueba con datos móviles o con otra wifi."
+    e is java.io.IOException ->
+        "Falló la conexión. Inténtalo de nuevo."
+    else -> e.message ?: porDefecto
 }
