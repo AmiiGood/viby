@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -81,11 +82,19 @@ fun MiniPlayer(
         }
     }
 
+    // En una tablet apaisada la tarjeta se estiraba a todo el ancho y dejaba el
+    // disco perdido en una esquina con medio metro de hueco. Se le pone tope y
+    // se centra: en un móvil no cambia nada porque nunca llega a ese ancho.
+    Box(
+        modifier = Modifier.fillMaxWidth(),
+        contentAlignment = Alignment.Center,
+    ) {
     Surface(
         color = MaterialTheme.colorScheme.surface,
         shape = RoundedCornerShape(20.dp),
         tonalElevation = 4.dp,
         modifier = dragModifier
+            .widthIn(max = 560.dp)
             // Sin esto la píldora de gestos del sistema se monta sobre la tarjeta.
             .navigationBarsPadding()
             .padding(horizontal = 10.dp, vertical = 6.dp),
@@ -174,5 +183,6 @@ fun MiniPlayer(
                 }
             }
         }
+    }
     }
 }

@@ -8,10 +8,12 @@ import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -61,6 +63,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -69,6 +72,7 @@ import com.sweetcode.viby.model.Song
 import coil.compose.AsyncImage
 import com.sweetcode.viby.ui.components.AlbumArt
 import com.sweetcode.viby.ui.components.AudioCover
+import com.sweetcode.viby.ui.theme.VibyPalette
 import com.sweetcode.viby.ui.theme.rememberVibyPalette
 import kotlin.math.roundToInt
 
@@ -97,7 +101,7 @@ fun NowPlayingScreen(
     // El color sale de la carátula: es la idea entera de esta dirección.
     val paleta = rememberVibyPalette(songUri = song.uri, artworkUri = state.artworkUri)
 
-    Box(
+    BoxWithConstraints(
         Modifier
             .fillMaxSize()
             .background(
@@ -108,9 +112,15 @@ fun NowPlayingScreen(
                 )
             )
     ) {
+        // Se compara el tamaño real y no la orientación declarada: así también
+        // acierta en pantalla dividida y en ventanas redimensionables.
+        val esHorizontal = maxWidth > maxHeight
 
         Column(
-            modifier = Modifier.fillMaxSize().statusBarsPadding().padding(24.dp),
+            modifier = Modifier.fillMaxSize().statusBarsPadding().padding(
+                horizontal = 24.dp,
+                vertical = if (esHorizontal) 10.dp else 24.dp,
+            ),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             // Barra superior
@@ -174,178 +184,82 @@ fun NowPlayingScreen(
                 }
             }
 
-            Spacer(Modifier.weight(1f))
-
-            // Carátula grande
-            val artModifier = Modifier
-                .fillMaxWidth(0.88f)
-                .aspectRatio(1f)
-                .clip(RoundedCornerShape(22.dp))
-            Box(
-                modifier = Modifier.fillMaxWidth().aspectRatio(1f),
-                contentAlignment = Alignment.Center,
-            ) {
-                // Halo del color de la portada: da profundidad sin desenfocarla entera.
-                Box(
-                    Modifier.fillMaxSize().background(
-                        Brush.radialGradient(
-                            colors = listOf(
-                                paleta.acento.copy(alpha = 0.30f),
-                                Color.Transparent,
-                            ),
-                        )
-                    )
-                )
-                if (state.currentStation != null) {
-                    AsyncImage(
-                        model = artModel,
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = artModifier.background(MaterialTheme.colorScheme.surfaceVariant),
-                    )
-                } else {
-                    AlbumArt(uri = song.uri, modifier = artModifier)
-                }
-            }
-
-            Spacer(Modifier.height(32.dp))
-
-            // Título / artista / álbum, centrados. El favorito va a la derecha del título.
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Spacer(Modifier.size(48.dp))
-                Text(
-                    text = song.title,
-                    fontSize = 26.sp,
-                    lineHeight = 30.sp,
-                    letterSpacing = (-0.4).sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
-                    textAlign = TextAlign.Center,
-                )
-                IconButton(onClick = onToggleFavorite) {
-                    Icon(
-                        imageVector = if (isFavorite) Icons.Rounded.Favorite
-                        else Icons.Rounded.FavoriteBorder,
-                        contentDescription = if (isFavorite) "Quitar de favoritos"
-                        else "Agregar a favoritos",
-                        tint = if (isFavorite) MaterialTheme.colorScheme.tertiary
-                        else Color.White.copy(alpha = 0.55f),
-                    )
-                }
-            }
-            Spacer(Modifier.height(2.dp))
-            Text(
-                text = song.artist,
-                style = MaterialTheme.typography.bodyLarge,
-                color = Color.White.copy(alpha = 0.62f),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.fillMaxWidth(),
-                textAlign = TextAlign.Center,
-            )
-            // Tercer nivel: el álbum daba contexto y no estaba en ningún sitio.
-            val contexto = listOfNotNull(
-                song.album.ifBlank { null },
-                state.currentStation?.subtitle?.ifBlank { null },
-            ).firstOrNull()
-            if (contexto != null) {
-                Spacer(Modifier.height(3.dp))
-                Text(
-                    text = contexto,
-                    fontSize = 12.sp,
-                    color = Color.White.copy(alpha = 0.34f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.fillMaxWidth(),
-                    textAlign = TextAlign.Center,
-                )
-            }
-
-            Spacer(Modifier.height(20.dp))
-
-            // Un stream en vivo no tiene duracion ni permite buscar dentro.
-            if (state.currentStation != null) {
-                LiveIndicator(paleta.acento)
-            } else {
-                // Barra de progreso arrastrable
-                SeekBar(
-                    positionMs = state.positionMs,
-                    durationMs = state.durationMs,
-                    acento = paleta.acento,
-                    onSeek = onSeek,
-                )
-            }
-
-            Spacer(Modifier.height(12.dp))
-
-            // Controles
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                IconButton(onClick = onToggleShuffle) {
-                    Icon(
-                        Icons.Rounded.Shuffle,
-                        contentDescription = "Aleatorio",
-                        tint = if (state.shuffleEnabled) paleta.acento
-                        else Color.White.copy(alpha = 0.45f),
-                    )
-                }
-                IconButton(onClick = onPrevious) {
-                    Icon(
-                        Icons.Rounded.SkipPrevious,
-                        contentDescription = "Anterior",
-                        tint = Color.White,
-                        modifier = Modifier.size(36.dp),
-                    )
-                }
-                // Botón play/pausa grande
-                Surface(
-                    shape = CircleShape,
-                    color = paleta.acento,
-                    modifier = Modifier.size(76.dp),
+            // En horizontal la carátula cuadrada a todo el ancho no cabe de alto:
+            // en una tablet apaisada empuja controles y texto fuera de pantalla.
+            // Ahí se pasa a dos columnas y la carátula se mide por el alto.
+            if (esHorizontal) {
+                // Como en una pantalla de asistente: la carátula manda a la
+                // izquierda con el transporte justo debajo, y la información
+                // ocupa la derecha. Así ninguna columna se queda sin alto y el
+                // botón de play conserva su círculo.
+                Row(
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    IconButton(onClick = onPlayPause) {
-                        Icon(
-                            imageVector = if (state.isPlaying) Icons.Rounded.Pause
-                            else Icons.Rounded.PlayArrow,
-                            contentDescription = if (state.isPlaying) "Pausar" else "Reproducir",
-                            tint = paleta.sobreAcento,
-                            modifier = Modifier.size(40.dp),
+                    Column(
+                        modifier = Modifier.weight(0.42f).fillMaxHeight(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
+                    ) {
+                        Box(
+                            modifier = Modifier.weight(1f).fillMaxWidth(),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Caratula(
+                                song = song,
+                                state = state,
+                                artModel = artModel,
+                                acento = paleta.acento,
+                                // matchHeightConstraintsFirst: por defecto aspectRatio
+                                // se ajusta al ancho, y aquí el lado corto es el alto.
+                                modifier = Modifier
+                                    .fillMaxHeight()
+                                    .aspectRatio(1f, matchHeightConstraintsFirst = true),
+                                proporcion = 0.97f,
+                            )
+                        }
+                        Spacer(Modifier.height(18.dp))
+                        ControlesTransporte(
+                            state, paleta, onPlayPause, onNext, onPrevious,
+                        )
+                    }
+                    Spacer(Modifier.width(32.dp))
+                    Column(
+                        modifier = Modifier.weight(0.58f).fillMaxHeight(),
+                        verticalArrangement = Arrangement.Center,
+                    ) {
+                        InfoPista(song, state, isFavorite, onToggleFavorite)
+                        Spacer(Modifier.height(24.dp))
+                        Progreso(state, paleta, onSeek)
+                        Spacer(Modifier.height(16.dp))
+                        ControlesSecundarios(
+                            state, paleta, onToggleShuffle, onCycleRepeat,
+                            modifier = Modifier.align(Alignment.CenterHorizontally),
                         )
                     }
                 }
-                IconButton(onClick = onNext) {
-                    Icon(
-                        Icons.Rounded.SkipNext,
-                        contentDescription = "Siguiente",
-                        tint = Color.White,
-                        modifier = Modifier.size(36.dp),
-                    )
-                }
-                IconButton(onClick = onCycleRepeat) {
-                    Icon(
-                        imageVector = if (state.repeatMode == Player.REPEAT_MODE_ONE)
-                            Icons.Rounded.RepeatOne else Icons.Rounded.Repeat,
-                        contentDescription = "Repetir",
-                        tint = if (state.repeatMode == Player.REPEAT_MODE_OFF)
-                            Color.White.copy(alpha = 0.45f) else paleta.acento,
-                    )
-                }
+            } else {
+                Spacer(Modifier.weight(1f))
+                Caratula(
+                    song = song,
+                    state = state,
+                    artModel = artModel,
+                    acento = paleta.acento,
+                    modifier = Modifier.fillMaxWidth().aspectRatio(1f),
+                )
+                Spacer(Modifier.height(32.dp))
+                InfoPista(song, state, isFavorite, onToggleFavorite)
+                Spacer(Modifier.height(20.dp))
+                ProgresoYControles(
+                    state, paleta, onSeek, onPlayPause,
+                    onNext, onPrevious, onToggleShuffle, onCycleRepeat,
+                )
+                Spacer(Modifier.weight(1f))
             }
-
-            Spacer(Modifier.weight(1f))
 
             // Lo que viene después. Una emisora no tiene cola, así que solo sale
             // cuando de verdad hay una canción siguiente.
-            if (nextSong != null && state.currentStation == null) {
+            if (!esHorizontal && nextSong != null && state.currentStation == null) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -380,6 +294,266 @@ fun NowPlayingScreen(
                 }
                 Spacer(Modifier.height(8.dp))
             }
+        }
+    }
+}
+
+
+/** La portada con su halo. El tamaño lo decide quien la coloca, vía [modifier]. */
+@Composable
+private fun Caratula(
+    song: Song,
+    state: PlayerUiState,
+    artModel: Any,
+    acento: Color,
+    modifier: Modifier = Modifier,
+    // Cuánto de la caja ocupa la portada. El resto es el margen donde se ve el
+    // halo; en horizontal se aprieta porque el alto es el recurso escaso.
+    proporcion: Float = 0.88f,
+) {
+    val artModifier = Modifier.fillMaxSize(proporcion).clip(RoundedCornerShape(22.dp))
+    Box(
+        modifier = modifier,
+        contentAlignment = Alignment.Center,
+    ) {
+        // Halo del color de la portada: da profundidad sin desenfocarla entera.
+        Box(
+            Modifier.fillMaxSize().background(
+                Brush.radialGradient(
+                    colors = listOf(
+                        acento.copy(alpha = 0.30f),
+                        Color.Transparent,
+                    ),
+                )
+            )
+        )
+        if (state.currentStation != null) {
+            AsyncImage(
+                model = artModel,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = artModifier.background(MaterialTheme.colorScheme.surfaceVariant),
+            )
+        } else {
+            AlbumArt(uri = song.uri, modifier = artModifier)
+        }
+    }
+}
+
+/** Título con el favorito al lado, artista y álbum. */
+@Composable
+private fun InfoPista(
+    song: Song,
+    state: PlayerUiState,
+    isFavorite: Boolean,
+    onToggleFavorite: () -> Unit,
+) {
+    // Título / artista / álbum, centrados. El favorito va a la derecha del título.
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Spacer(Modifier.size(48.dp))
+        Text(
+            text = song.title,
+            fontSize = 26.sp,
+            lineHeight = 30.sp,
+            letterSpacing = (-0.4).sp,
+            fontWeight = FontWeight.Bold,
+            color = Color.White,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+            textAlign = TextAlign.Center,
+        )
+        IconButton(onClick = onToggleFavorite) {
+            Icon(
+                imageVector = if (isFavorite) Icons.Rounded.Favorite
+                else Icons.Rounded.FavoriteBorder,
+                contentDescription = if (isFavorite) "Quitar de favoritos"
+                else "Agregar a favoritos",
+                tint = if (isFavorite) MaterialTheme.colorScheme.tertiary
+                else Color.White.copy(alpha = 0.55f),
+            )
+        }
+    }
+    Spacer(Modifier.height(2.dp))
+    Text(
+        text = song.artist,
+        style = MaterialTheme.typography.bodyLarge,
+        color = Color.White.copy(alpha = 0.62f),
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        modifier = Modifier.fillMaxWidth(),
+        textAlign = TextAlign.Center,
+    )
+    // Tercer nivel: el álbum daba contexto y no estaba en ningún sitio.
+    val contexto = listOfNotNull(
+        song.album.ifBlank { null },
+        state.currentStation?.subtitle?.ifBlank { null },
+    ).firstOrNull()
+    if (contexto != null) {
+        Spacer(Modifier.height(3.dp))
+        Text(
+            text = contexto,
+            fontSize = 12.sp,
+            color = Color.White.copy(alpha = 0.34f),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.fillMaxWidth(),
+            textAlign = TextAlign.Center,
+        )
+    }
+
+    Spacer(Modifier.height(20.dp))
+
+}
+/** Progreso (o EN VIVO) con sus tiempos. */
+@Composable
+private fun Progreso(
+    state: PlayerUiState,
+    paleta: VibyPalette,
+    onSeek: (Long) -> Unit,
+) {
+    if (state.currentStation != null) {
+        LiveIndicator(paleta.acento)
+    } else {
+        SeekBar(
+            positionMs = state.positionMs,
+            durationMs = state.durationMs,
+            acento = paleta.acento,
+            onSeek = onSeek,
+        )
+    }
+}
+
+/**
+ * Anterior, play/pausa y siguiente.
+ *
+ * El botón lleva tamaño fijo y va dentro de un Box con alto reservado: sin eso,
+ * cuando la fila se queda sin espacio vertical Compose lo comprime y el círculo
+ * sale como un óvalo, que es lo que pasaba en horizontal.
+ */
+@Composable
+private fun ControlesTransporte(
+    state: PlayerUiState,
+    paleta: VibyPalette,
+    onPlayPause: () -> Unit,
+    onNext: () -> Unit,
+    onPrevious: () -> Unit,
+    diametro: Dp = 76.dp,
+) {
+    Row(
+        modifier = Modifier.height(diametro),
+        horizontalArrangement = Arrangement.spacedBy(20.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        IconButton(onClick = onPrevious, modifier = Modifier.size(56.dp)) {
+            Icon(
+                Icons.Rounded.SkipPrevious,
+                contentDescription = "Anterior",
+                tint = Color.White,
+                modifier = Modifier.size(42.dp),
+            )
+        }
+        Surface(
+            shape = CircleShape,
+            color = paleta.acento,
+            modifier = Modifier.size(diametro),
+        ) {
+            IconButton(onClick = onPlayPause) {
+                Icon(
+                    imageVector = if (state.isPlaying) Icons.Rounded.Pause
+                    else Icons.Rounded.PlayArrow,
+                    contentDescription = if (state.isPlaying) "Pausar" else "Reproducir",
+                    tint = paleta.sobreAcento,
+                    modifier = Modifier.size(diametro * 0.45f),
+                )
+            }
+        }
+        IconButton(onClick = onNext, modifier = Modifier.size(56.dp)) {
+            Icon(
+                Icons.Rounded.SkipNext,
+                contentDescription = "Siguiente",
+                tint = Color.White,
+                modifier = Modifier.size(42.dp),
+            )
+        }
+    }
+}
+
+/** Aleatorio y repetir: secundarios, se separan del transporte en horizontal. */
+@Composable
+private fun ControlesSecundarios(
+    state: PlayerUiState,
+    paleta: VibyPalette,
+    onToggleShuffle: () -> Unit,
+    onCycleRepeat: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(32.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        IconButton(onClick = onToggleShuffle, modifier = Modifier.size(52.dp)) {
+            Icon(
+                Icons.Rounded.Shuffle,
+                contentDescription = "Aleatorio",
+                modifier = Modifier.size(28.dp),
+                tint = if (state.shuffleEnabled) paleta.acento
+                else Color.White.copy(alpha = 0.45f),
+            )
+        }
+        IconButton(onClick = onCycleRepeat, modifier = Modifier.size(52.dp)) {
+            Icon(
+                imageVector = if (state.repeatMode == Player.REPEAT_MODE_ONE)
+                    Icons.Rounded.RepeatOne else Icons.Rounded.Repeat,
+                contentDescription = "Repetir",
+                modifier = Modifier.size(28.dp),
+                tint = if (state.repeatMode == Player.REPEAT_MODE_OFF)
+                    Color.White.copy(alpha = 0.45f) else paleta.acento,
+            )
+        }
+    }
+}
+
+/** Disposición vertical: progreso y una sola fila con los cinco controles. */
+@Composable
+private fun ProgresoYControles(
+    state: PlayerUiState,
+    paleta: VibyPalette,
+    onSeek: (Long) -> Unit,
+    onPlayPause: () -> Unit,
+    onNext: () -> Unit,
+    onPrevious: () -> Unit,
+    onToggleShuffle: () -> Unit,
+    onCycleRepeat: () -> Unit,
+) {
+    Progreso(state, paleta, onSeek)
+    Spacer(Modifier.height(12.dp))
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceEvenly,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        IconButton(onClick = onToggleShuffle) {
+            Icon(
+                Icons.Rounded.Shuffle,
+                contentDescription = "Aleatorio",
+                tint = if (state.shuffleEnabled) paleta.acento
+                else Color.White.copy(alpha = 0.45f),
+            )
+        }
+        ControlesTransporte(state, paleta, onPlayPause, onNext, onPrevious)
+        IconButton(onClick = onCycleRepeat) {
+            Icon(
+                imageVector = if (state.repeatMode == Player.REPEAT_MODE_ONE)
+                    Icons.Rounded.RepeatOne else Icons.Rounded.Repeat,
+                contentDescription = "Repetir",
+                tint = if (state.repeatMode == Player.REPEAT_MODE_OFF)
+                    Color.White.copy(alpha = 0.45f) else paleta.acento,
+            )
         }
     }
 }
