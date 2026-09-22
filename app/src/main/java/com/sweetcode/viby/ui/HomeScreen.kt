@@ -104,6 +104,7 @@ fun HomeScreen(
     val state by vm.uiState.collectAsStateWithLifecycle()
     val favorites by vm.favorites.collectAsStateWithLifecycle()
     val queue by vm.queue.collectAsStateWithLifecycle()
+    val abrirReproductor by vm.abrirReproductor.collectAsStateWithLifecycle()
 
     var tabIndex by rememberSaveable { mutableStateOf(0) }
     val tab = Tab.entries[tabIndex]
@@ -143,6 +144,15 @@ fun HomeScreen(
             expandedTarget = open
             scope.launch {
                 progress.animateTo(if (open) 1f else 0f, spring(stiffness = Spring.StiffnessMediumLow))
+            }
+        }
+
+        // Radio no tiene reproductor completo: cuando pide abrirlo, vuelve aquí y
+        // se despliega. La señal se consume para que no se repita al recomponer.
+        LaunchedEffect(abrirReproductor) {
+            if (abrirReproductor && state.currentSong != null) {
+                settle(true)
+                vm.reproductorYaAbierto()
             }
         }
 

@@ -87,6 +87,10 @@ private fun VibyApp() {
                 isPlaying = state.isPlaying,
                 onPlayPause = vm::togglePlay,
                 artworkUri = state.artworkUri,
+                onExpandPlayer = {
+                    vm.pedirAbrirReproductor()
+                    nav.popBackStack()
+                },
             )
         }
         composable("discover") {

@@ -17,6 +17,7 @@ import com.sweetcode.viby.data.MusicRepository
 import com.sweetcode.viby.model.Song
 import com.sweetcode.viby.model.Station
 import com.sweetcode.viby.playback.PlaybackService
+import com.sweetcode.viby.radio.StationRepository
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -36,6 +37,14 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
     private val _uiState = MutableStateFlow(PlayerUiState())
     val uiState: StateFlow<PlayerUiState> = _uiState.asStateFlow()
 
+    // Señal para que la pantalla de inicio despliegue el reproductor: lo pide
+    // Radio, que no tiene el reproductor completo y solo puede volver atrás.
+    private val _abrirReproductor = MutableStateFlow(false)
+    val abrirReproductor: StateFlow<Boolean> = _abrirReproductor.asStateFlow()
+
+    fun pedirAbrirReproductor() { _abrirReproductor.value = true }
+    fun reproductorYaAbierto() { _abrirReproductor.value = false }
+
     private val _favorites = MutableStateFlow(repo.loadFavorites())
     val favorites: StateFlow<Set<String>> = _favorites.asStateFlow()
 
@@ -43,6 +52,24 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
 
     // Emisora sonando ahora, o null si suena la biblioteca. Manda sobre currentSong.
     private var playingStation: Station? = null
+
+    // El catálogo guarda favoritas y recientes: es donde buscar la emisora
+    // cuando el proceso muere y hay que reconstruir el estado.
+    private val stations = StationRepository(app)
+
+    /**
+     * Al cerrar la app el servicio sigue sonando, pero el ViewModel se muere con el
+     * proceso y [playingStation] se pierde. Sin esto, al volver a abrir el mini
+     * reproductor salía vacío aunque la emisora siguiera sonando.
+     *
+     * Se recupera cruzando el mediaId del reproductor con lo que hay guardado.
+     */
+    private fun recuperarEmisoraEnCurso() {
+        val id = controller?.currentMediaItem?.mediaId ?: return
+        if (playingStation?.id == id) return
+        playingStation = (stations.loadRecents() + stations.loadFavorites())
+            .firstOrNull { it.id == id }
+    }
 
     // Orden lógico de la cola (sin barajar) y estado de aleatorio propio.
     // Manejamos el shuffle nosotros para garantizar un rebarajado real cada vez.
@@ -63,6 +90,7 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
                     repeatMode = repo.loadRepeat() // restaura el modo de repetición
                 }
                 controllerReady = true
+                recuperarEmisoraEnCurso()
                 syncFromPlayer()
                 rebuildQueue()
                 tryRestorePlayback()
@@ -83,6 +111,7 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
         }
         override fun onPlaybackStateChanged(playbackState: Int) = syncFromPlayer()
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+            recuperarEmisoraEnCurso()
             syncFromPlayer()
             rebuildQueue()
             persistPlayback()
