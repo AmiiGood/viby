@@ -32,6 +32,8 @@ import com.sweetcode.viby.ui.HomeScreen
 import com.sweetcode.viby.ui.PlayerViewModel
 import com.sweetcode.viby.ui.QueueScreen
 import com.sweetcode.viby.ui.RadioScreen
+import com.sweetcode.viby.ui.UpdateViewModel
+import com.sweetcode.viby.ui.components.UpdateDialog
 import com.sweetcode.viby.ui.theme.VibyTheme
 
 class MainActivity : ComponentActivity() {
@@ -52,6 +54,8 @@ class MainActivity : ComponentActivity() {
 private fun VibyApp() {
     val vm: PlayerViewModel = viewModel()
     val nav = rememberNavController()
+
+    AvisoDeActualizacion()
 
     // Refresca la biblioteca cuando termina una descarga (estés en la pantalla que estés).
     val downloadsDone by DownloadProgress.completed.collectAsStateWithLifecycle()
@@ -189,4 +193,39 @@ private fun RequestBatteryExemption() {
             runCatching { launcher.launch(intent) }
         }
     }
+}
+
+/**
+ * Aviso de versión nueva publicada en GitHub.
+ *
+ * Vive aquí arriba y no dentro de una pantalla concreta para que salga se esté
+ * donde se esté, que es cuando de verdad se ve.
+ */
+@Composable
+private fun AvisoDeActualizacion() {
+    val vm: UpdateViewModel = viewModel()
+    val state by vm.state.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+
+    // Al volver de los ajustes de permiso se reintenta, que es lo que la persona
+    // esperaba al tocar "Actualizar"; si volvió sin darlo, no pasa nada.
+    val ajustes = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { vm.actualizar() }
+
+    LaunchedEffect(state.lanzar) {
+        val intent = state.lanzar ?: return@LaunchedEffect
+        val esPermiso = state.esPermiso
+        vm.lanzado()
+        runCatching {
+            if (esPermiso) ajustes.launch(intent) else context.startActivity(intent)
+        }
+    }
+
+    UpdateDialog(
+        state = state,
+        versionInstalada = vm.versionInstalada,
+        onActualizar = vm::actualizar,
+        onPosponer = vm::posponer,
+    )
 }
