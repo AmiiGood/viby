@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import androidx.documentfile.provider.DocumentFile
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -38,6 +39,12 @@ class ArtistImages(private val context: Context) {
     /** En memoria, para no recorrer el árbol en cada recomposición de la lista. */
     private val resueltas = HashMap<String, Uri?>()
 
+    /**
+     * Un candado por artista, para que dos filas que piden la misma foto a la vez
+     * no la descarguen (ni la escriban) dos veces.
+     */
+    private val enCurso = HashMap<String, Mutex>()
+
     /** Índice carpeta-normalizada -> carpeta, construido una sola vez por raíz. */
     private val candado = Mutex()
     private var raizIndexada: Uri? = null
@@ -49,23 +56,46 @@ class ArtistImages(private val context: Context) {
      * @return el URI del fichero ya guardado, o null si no se pudo resolver.
      */
     suspend fun deArtista(nombre: String, raiz: Uri): Uri? {
-        synchronized(resueltas) { if (resueltas.containsKey(nombre)) return resueltas[nombre] }
-        val uri = withContext(Dispatchers.IO) { runCatching { resolver(nombre, raiz) }.getOrNull() }
-        synchronized(resueltas) { resueltas[nombre] = uri }
-        return uri
+        yaResuelta(nombre)?.let { return it.valor }
+
+        // La lista recicla filas: al desplazarla, el mismo artista se pide varias
+        // veces y las peticiones se solapan. Sin esto se descargaba la foto dos
+        // veces y la segunda se guardaba como "artist (1).jpg".
+        val suyo = synchronized(enCurso) { enCurso.getOrPut(nombre) { Mutex() } }
+        return suyo.withLock {
+            yaResuelta(nombre)?.let { return@withLock it.valor }
+            val uri = withContext(Dispatchers.IO) {
+                runCatching { resolver(nombre, raiz) }.getOrNull()
+            }
+            synchronized(resueltas) { resueltas[nombre] = uri }
+            uri
+        }
+    }
+
+    /** Envuelto para distinguir "resuelta y dio null" de "sin resolver". */
+    private class Resuelta(val valor: Uri?)
+
+    private fun yaResuelta(nombre: String): Resuelta? = synchronized(resueltas) {
+        if (resueltas.containsKey(nombre)) Resuelta(resueltas[nombre]) else null
     }
 
     private suspend fun resolver(nombre: String, raiz: Uri): Uri? {
         val carpeta = carpetaDe(nombre, raiz) ?: return null
 
         // Ya descargada en una sesión anterior: no se vuelve a pedir.
-        carpeta.findFile(NOMBRE)?.takeIf { it.length() > 0 }?.let { return it.uri }
+        val existente = carpeta.findFile(NOMBRE)
+        existente?.takeIf { it.length() > 0 }?.let { return it.uri }
 
         val bytes = descargar(nombre) ?: return null
-        val destino = carpeta.createFile("image/jpeg", NOMBRE) ?: return null
-        context.contentResolver.openOutputStream(destino.uri)?.use { it.write(bytes) }
-            ?: return null
-        return destino.uri
+        // Si quedó un fichero a medias (la app se cerró durante la escritura) se
+        // reescribe ese mismo. Crear otro solo conseguiría un "artist (1).jpg".
+        val destino = existente ?: carpeta.createFile("image/jpeg", NOMBRE) ?: return null
+        // Los bytes ya están en memoria: que una cancelación no lo deje truncado.
+        return withContext(NonCancellable) {
+            val ok = context.contentResolver.openOutputStream(destino.uri)
+                ?.use { it.write(bytes); true } ?: false
+            if (ok) destino.uri else null
+        }
     }
 
     /**
