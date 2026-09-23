@@ -250,19 +250,26 @@ fun NowPlayingScreen(
                     }
                 }
             } else {
-                Spacer(Modifier.weight(1f))
+                Spacer(Modifier.height(8.dp))
                 Caratula(
                     song = song,
                     state = state,
                     artModel = artModel,
                     acento = paleta.acento,
-                    modifier = Modifier.fillMaxWidth().aspectRatio(1f),
+                    // La carátula es quien cede cuando la pantalla va justa. Antes
+                    // era cuadrada al ancho pase lo que pase, así que en un móvil
+                    // la columna llenaba el alto exacto, los espaciadores flexibles
+                    // se quedaban en cero y el botón de play acababa pegado a la
+                    // tarjeta de "a continuación". Con peso puede encogerse: el
+                    // aspecto 1:1 se resuelve por el alto disponible si el ancho
+                    // no cabe, y sigue centrada.
+                    modifier = Modifier.weight(8f, fill = false).aspectRatio(1f),
                     onNext = onNext,
                     onPrevious = onPrevious,
                 )
-                Spacer(Modifier.height(32.dp))
+                Spacer(Modifier.height(24.dp))
                 InfoPista(song, state, isFavorite, onToggleFavorite)
-                Spacer(Modifier.height(20.dp))
+                Spacer(Modifier.height(12.dp))
                 ProgresoYControles(
                     state, paleta, onSeek, onPlayPause,
                     onNext, onPrevious, onToggleShuffle, onCycleRepeat,
@@ -273,6 +280,9 @@ fun NowPlayingScreen(
             // Lo que viene después. Una emisora no tiene cola, así que solo sale
             // cuando de verdad hay una canción siguiente.
             if (!esHorizontal && nextSong != null && state.currentStation == null) {
+                // Separación mínima pase lo que pase: el espaciador flexible de
+                // arriba vale cero en cuanto la pantalla se queda sin sitio.
+                Spacer(Modifier.height(20.dp))
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
