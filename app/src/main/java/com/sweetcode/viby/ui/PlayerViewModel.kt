@@ -280,6 +280,22 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
         syncFromPlayer()
     }
 
+    /**
+     * Reproduce la lista en aleatorio, encendiéndolo si estaba apagado.
+     *
+     * No se pasa por [toggleShuffle] porque ese reordena la cola actual, que es
+     * justo la que se va a sustituir.
+     */
+    fun playShuffled(list: List<Song>) {
+        if (list.isEmpty()) return
+        if (!shuffleOn) {
+            shuffleOn = true
+            repo.saveShuffle(true)
+            _uiState.value = _uiState.value.copy(shuffleEnabled = true)
+        }
+        play(list, 0)
+    }
+
     fun togglePlay() {
         val c = controller ?: return
         if (c.isPlaying) c.pause() else c.play()

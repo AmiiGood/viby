@@ -24,6 +24,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.sweetcode.viby.download.DownloadProgress
+import com.sweetcode.viby.ui.ArtistScreen
 import com.sweetcode.viby.ui.DetailScreen
 import com.sweetcode.viby.ui.DiscoverScreen
 import com.sweetcode.viby.ui.DownloadScreen
@@ -34,6 +35,7 @@ import com.sweetcode.viby.ui.QueueScreen
 import com.sweetcode.viby.ui.RadioScreen
 import com.sweetcode.viby.ui.UpdateViewModel
 import com.sweetcode.viby.ui.components.UpdateDialog
+import com.sweetcode.viby.ui.components.recordarFotoDeArtista
 import com.sweetcode.viby.ui.theme.VibyTheme
 
 class MainActivity : ComponentActivity() {
@@ -129,9 +131,23 @@ private fun VibyApp() {
             val clave = Uri.decode(entry.arguments?.getString("clave").orEmpty())
             val artistas by vm.artistas.collectAsStateWithLifecycle()
             val artista = artistas.firstOrNull { it.clave == clave }
-            val suyas = remember(artista) { artista?.canciones?.mapTo(HashSet()) { it.id }.orEmpty() }
-            DetailContent(vm, artista?.nombre ?: clave, onBack = { nav.popBackStack() }) {
-                it.id in suyas
+            if (artista == null) {
+                // La biblioteca aún se está cargando, o el artista ya no existe
+                // tras reescanear. Volver es mejor que una pantalla vacía.
+                LaunchedEffect(artistas) { if (artistas.isNotEmpty()) nav.popBackStack() }
+            } else {
+                val state by vm.uiState.collectAsStateWithLifecycle()
+                val favorites by vm.favorites.collectAsStateWithLifecycle()
+                ArtistScreen(
+                    artista = artista,
+                    foto = recordarFotoDeArtista(artista, vm.carpetaRaiz, vm.artistImages),
+                    currentId = state.currentSong?.id,
+                    favorites = favorites,
+                    onBack = { nav.popBackStack() },
+                    onPlay = vm::play,
+                    onShuffle = vm::playShuffled,
+                    onToggleFavorite = vm::toggleFavorite,
+                )
             }
         }
     }

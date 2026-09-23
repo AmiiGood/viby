@@ -70,6 +70,16 @@ private fun cargarMiniatura(context: Context, songUri: Uri?, artworkUri: Uri?): 
             BitmapFactory.decodeFile(ruta, opciones)?.let { return it }
         }
     }
+
+    // 1b. Imagen dentro de la biblioteca del usuario (la foto del artista), a la
+    // que solo se llega por el proveedor de documentos.
+    artworkUri?.takeIf { it.scheme == "content" }?.let { uri ->
+        runCatching {
+            context.contentResolver.openInputStream(uri)?.use {
+                BitmapFactory.decodeStream(it, null, opciones)
+            }
+        }.getOrNull()?.let { return it }
+    }
     if (songUri == null) return null
 
     // 2. Miniatura ya cacheada del archivo local.

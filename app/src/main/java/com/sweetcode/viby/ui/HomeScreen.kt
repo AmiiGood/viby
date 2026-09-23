@@ -87,10 +87,12 @@ import com.sweetcode.viby.data.ArtistImages
 import com.sweetcode.viby.data.Artista
 import com.sweetcode.viby.model.Song
 import com.sweetcode.viby.ui.components.AlbumArt
+import com.sweetcode.viby.ui.components.FotoDeArtista
 import com.sweetcode.viby.ui.components.MiniPlayer
 import com.sweetcode.viby.ui.components.SongRow
 import com.sweetcode.viby.ui.components.VibyTabs
 import com.sweetcode.viby.ui.components.VibyTopBar
+import com.sweetcode.viby.ui.components.recordarFotoDeArtista
 import kotlinx.coroutines.launch
 
 private enum class Tab(val label: String, val icon: ImageVector) {
@@ -434,7 +436,7 @@ private fun ArtistList(
                     .padding(vertical = 12.dp, horizontal = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                FotoDeArtista(artista, raiz, imagenes)
+                FotoDeArtista(recordarFotoDeArtista(artista, raiz, imagenes), Modifier.size(52.dp))
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
                     Text(name, maxLines = 1, overflow = TextOverflow.Ellipsis,
@@ -599,43 +601,3 @@ private fun CenteredMessage(title: String, subtitle: String, buttonText: String,
     }
 }
 
-/**
- * Foto del artista. Se resuelve fuera del hilo principal y solo una vez por
- * nombre: la primera vez se descarga y se guarda en su carpeta, después ya está.
- *
- * Mientras no haya foto se deja el icono de siempre, así que la lista sigue
- * funcionando sin conexión y sin esperas.
- */
-@Composable
-private fun FotoDeArtista(artista: Artista, raiz: Uri?, imagenes: ArtistImages) {
-    val foto by produceState<Uri?>(initialValue = null, artista, raiz) {
-        value = raiz?.let {
-            imagenes.deArtista(
-                nombre = artista.nombre,
-                otrosNombres = artista.unidos,
-                muestra = artista.canciones.firstOrNull()?.title,
-                raiz = it,
-            )
-        }
-    }
-    Box(
-        Modifier.size(52.dp).clip(CircleShape)
-            .background(MaterialTheme.colorScheme.surfaceVariant),
-        contentAlignment = Alignment.Center,
-    ) {
-        if (foto != null) {
-            AsyncImage(
-                model = foto,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize(),
-            )
-        } else {
-            Icon(
-                Icons.Rounded.Person,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}
