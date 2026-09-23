@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -117,10 +118,17 @@ fun NowPlayingScreen(
         val esHorizontal = maxWidth > maxHeight
 
         Column(
-            modifier = Modifier.fillMaxSize().statusBarsPadding().padding(
-                horizontal = 24.dp,
-                vertical = if (esHorizontal) 10.dp else 24.dp,
-            ),
+            // navigationBarsPadding es imprescindible: con navegacion de tres
+            // botones (o la barra de tareas de Samsung) el contenido de abajo
+            // quedaba debajo del sistema. Con gestos apenas se notaba.
+            modifier = Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+                .navigationBarsPadding()
+                .padding(
+                    horizontal = 24.dp,
+                    vertical = if (esHorizontal) 10.dp else 24.dp,
+                ),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             // Barra superior

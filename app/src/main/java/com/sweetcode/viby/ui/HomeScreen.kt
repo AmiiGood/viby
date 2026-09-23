@@ -179,11 +179,10 @@ fun HomeScreen(
                 Column {
                     VibyTopBar(
                     title = {
-                        if (tab == Tab.SONGS && searching) {
-                            SearchField(query = query, onQueryChange = { query = it })
-                        } else {
-                            Text(if (tab == Tab.SONGS) "Viby" else tab.label, fontWeight = FontWeight.Bold)
-                        }
+                        Text(
+                            if (tab == Tab.SONGS) "Viby" else tab.label,
+                            fontWeight = FontWeight.Bold,
+                        )
                     },
                     actions = {
                         if (tab == Tab.SONGS) {
@@ -213,6 +212,16 @@ fun HomeScreen(
                         }
                     },
                     )
+                    // El buscador va BAJO la cabecera, no dentro: un TextField mide
+                    // 56dp de alto y la barra superior no da tanto, asi que se
+                    // recortaba por arriba y perdia sus esquinas.
+                    if (tab == Tab.SONGS && searching) {
+                        SearchField(
+                            query = query,
+                            onQueryChange = { query = it },
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                        )
+                    }
                     VibyTabs(
                         labels = Tab.entries.map { it.label },
                         selected = tabIndex,
@@ -408,12 +417,16 @@ private fun ArtistList(songs: List<Song>, onOpenArtist: (String) -> Unit) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun SearchField(query: String, onQueryChange: (String) -> Unit) {
+private fun SearchField(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val focusManager = LocalFocusManager.current
     TextField(
         value = query,
         onValueChange = onQueryChange,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         placeholder = { Text("Buscar canción, artista o álbum…") },
         singleLine = true,
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
