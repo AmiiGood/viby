@@ -5,6 +5,8 @@ import android.content.Context
 import android.content.Intent
 import android.media.AudioManager
 import android.net.Uri
+import androidx.media3.common.AudioAttributes
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Metadata
@@ -51,6 +53,16 @@ class PlaybackService : MediaSessionService() {
         super.onCreate()
         val player = ExoPlayer.Builder(this)
             .setHandleAudioBecomingNoisy(true) // pausa al desconectar audífonos
+            // Sin esto el reproductor no participaba del foco de audio: ni callaba
+            // a otras apps al empezar, ni se pausaba cuando otra (o el preview de
+            // descargas) reclamaba el foco. Resultado: dos audios a la vez.
+            .setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setUsage(C.USAGE_MEDIA)
+                    .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
+                    .build(),
+                /* handleAudioFocus = */ true,
+            )
             .build()
         val sessionId = (getSystemService(Context.AUDIO_SERVICE) as AudioManager)
             .generateAudioSessionId()

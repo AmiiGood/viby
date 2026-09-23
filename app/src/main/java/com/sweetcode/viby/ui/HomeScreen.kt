@@ -1,5 +1,6 @@
 package com.sweetcode.viby.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.Animatable
@@ -144,6 +145,16 @@ fun HomeScreen(
             expandedTarget = open
             scope.launch {
                 progress.animateTo(if (open) 1f else 0f, spring(stiffness = Spring.StiffnessMediumLow))
+            }
+        }
+
+        // El reproductor es una capa superpuesta, no un destino de navegación, así
+        // que el sistema no sabía que había algo que cerrar y el botón atrás sacaba
+        // de la app. Lo mismo con la búsqueda abierta.
+        BackHandler(enabled = expandedTarget || searching) {
+            when {
+                expandedTarget -> settle(false)
+                searching -> { query = ""; searching = false }
             }
         }
 

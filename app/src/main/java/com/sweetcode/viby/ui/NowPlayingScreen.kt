@@ -61,6 +61,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -224,6 +225,8 @@ fun NowPlayingScreen(
                                     .fillMaxHeight()
                                     .aspectRatio(1f, matchHeightConstraintsFirst = true),
                                 proporcion = 0.97f,
+                                onNext = onNext,
+                                onPrevious = onPrevious,
                             )
                         }
                         Spacer(Modifier.height(18.dp))
@@ -254,6 +257,8 @@ fun NowPlayingScreen(
                     artModel = artModel,
                     acento = paleta.acento,
                     modifier = Modifier.fillMaxWidth().aspectRatio(1f),
+                    onNext = onNext,
+                    onPrevious = onPrevious,
                 )
                 Spacer(Modifier.height(32.dp))
                 InfoPista(song, state, isFavorite, onToggleFavorite)
@@ -318,10 +323,30 @@ private fun Caratula(
     // Cuánto de la caja ocupa la portada. El resto es el margen donde se ve el
     // halo; en horizontal se aprieta porque el alto es el recurso escaso.
     proporcion: Float = 0.88f,
+    onNext: (() -> Unit)? = null,
+    onPrevious: (() -> Unit)? = null,
 ) {
     val artModifier = Modifier.fillMaxSize(proporcion).clip(RoundedCornerShape(22.dp))
+    // Deslizar sobre la portada cambia de pista. Va solo aquí y no en toda la
+    // pantalla para no pelearse con la barra de progreso ni con el arrastre
+    // vertical que cierra el reproductor.
+    val umbral = with(LocalDensity.current) { 72.dp.toPx() }
+    val gesto = if (onNext == null && onPrevious == null) Modifier else Modifier.pointerInput(Unit) {
+        var recorrido = 0f
+        detectHorizontalDragGestures(
+            onDragStart = { recorrido = 0f },
+            onDragCancel = { recorrido = 0f },
+            onDragEnd = {
+                when {
+                    recorrido <= -umbral -> onNext?.invoke()
+                    recorrido >= umbral -> onPrevious?.invoke()
+                }
+                recorrido = 0f
+            },
+        ) { _, delta -> recorrido += delta }
+    }
     Box(
-        modifier = modifier,
+        modifier = modifier.then(gesto),
         contentAlignment = Alignment.Center,
     ) {
         // Halo del color de la portada: da profundidad sin desenfocarla entera.
