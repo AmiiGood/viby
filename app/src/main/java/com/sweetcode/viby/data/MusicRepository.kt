@@ -235,6 +235,28 @@ class MusicRepository(private val context: Context) {
             .apply()
     }
 
+    // ---- Fotos de artista ya descargadas ----
+
+    /**
+     * Artistas cuya foto ya se bajó con la fuente actual.
+     *
+     * Si se cambia de dónde salen las fotos, lo guardado antes deja de valer: se
+     * vacía la lista y se vuelven a pedir, sobrescribiendo el fichero. Sin esto,
+     * cambiar de fuente no se notaría nunca, porque el `artist.jpg` viejo sigue ahí.
+     */
+    fun loadArtistPhotosDone(fuente: String): Set<String> {
+        if (prefs.getString(KEY_FOTO_FUENTE, null) != fuente) {
+            prefs.edit().putString(KEY_FOTO_FUENTE, fuente).remove(KEY_FOTO_HECHAS).apply()
+            return emptySet()
+        }
+        return prefs.getStringSet(KEY_FOTO_HECHAS, emptySet()).orEmpty()
+    }
+
+    fun markArtistPhotoDone(clave: String) {
+        val actual = prefs.getStringSet(KEY_FOTO_HECHAS, emptySet()).orEmpty()
+        prefs.edit().putStringSet(KEY_FOTO_HECHAS, actual + clave).apply()
+    }
+
     // ---- Modos de reproducción (aleatorio / repetir) ----
 
     fun saveShuffle(on: Boolean) = prefs.edit().putBoolean(KEY_SHUFFLE, on).apply()
@@ -252,6 +274,8 @@ class MusicRepository(private val context: Context) {
         private const val KEY_SHUFFLE = "pb_shuffle"
         private const val KEY_REPEAT = "pb_repeat"
         private const val KEY_ALIAS = "artist_aliases"
+        private const val KEY_FOTO_FUENTE = "artist_photo_source"
+        private const val KEY_FOTO_HECHAS = "artist_photo_done"
 
         /** Las claves son alfanuméricas, así que no puede aparecer dentro de una. */
         private const val SEPARADOR_ALIAS = ">"

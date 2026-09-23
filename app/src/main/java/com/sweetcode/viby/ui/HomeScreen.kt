@@ -434,7 +434,7 @@ private fun ArtistList(
                     .padding(vertical = 12.dp, horizontal = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                FotoDeArtista(name, raiz, imagenes)
+                FotoDeArtista(artista, raiz, imagenes)
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
                     Text(name, maxLines = 1, overflow = TextOverflow.Ellipsis,
@@ -607,9 +607,16 @@ private fun CenteredMessage(title: String, subtitle: String, buttonText: String,
  * funcionando sin conexión y sin esperas.
  */
 @Composable
-private fun FotoDeArtista(nombre: String, raiz: Uri?, imagenes: ArtistImages) {
-    val foto by produceState<Uri?>(initialValue = null, nombre, raiz) {
-        value = raiz?.let { imagenes.deArtista(nombre, it) }
+private fun FotoDeArtista(artista: Artista, raiz: Uri?, imagenes: ArtistImages) {
+    val foto by produceState<Uri?>(initialValue = null, artista, raiz) {
+        value = raiz?.let {
+            imagenes.deArtista(
+                nombre = artista.nombre,
+                otrosNombres = artista.unidos,
+                muestra = artista.canciones.firstOrNull()?.title,
+                raiz = it,
+            )
+        }
     }
     Box(
         Modifier.size(52.dp).clip(CircleShape)

@@ -39,7 +39,7 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
     val carpetaRaiz: Uri? get() = repo.savedFolderUri()
 
     /** Resuelve (y descarga una vez) las fotos de artista. */
-    val artistImages = ArtistImages(app)
+    val artistImages = ArtistImages(app, repo)
 
     private val _songs = MutableStateFlow<List<Song>>(emptyList())
     val songs: StateFlow<List<Song>> = _songs.asStateFlow()
