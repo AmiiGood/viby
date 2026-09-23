@@ -27,7 +27,9 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
 
 /**
  * Servicio de reproducción en segundo plano (Media3).
@@ -82,6 +84,67 @@ class PlaybackService : MediaSessionService() {
             .setSessionActivity(openApp)
             .setBitmapLoader(EmbeddedArtBitmapLoader(applicationContext))
             .build()
+
+        vigilarTemporizador(player)
+    }
+
+    /**
+     * Cumple el temporizador de apagado.
+     *
+     * Se hace aquí y no en la pantalla porque quien lo programa deja el móvil y
+     * se duerme: el temporizador tiene que correr con la reproducción.
+     */
+    private fun vigilarTemporizador(player: ExoPlayer) {
+        scope.launch {
+            // collectLatest: si se reprograma o se cancela, la espera anterior se
+            // descarta en vez de pausar más tarde por sorpresa.
+            SleepTimer.hasta.collectLatest { hasta ->
+                if (hasta == null) return@collectLatest
+                val falta = hasta - System.currentTimeMillis()
+                if (falta > 0) delay(falta)
+                mediaSession?.player?.pause()
+                SleepTimer.cancelar()
+            }
+        }
+        scope.launch {
+            // Que lo pare el propio reproductor al final de la pista sale mejor
+            // que escuchar el cambio de canción: así la siguiente ni empieza.
+            SleepTimer.alTerminarPista.collect { activo ->
+                player.pauseAtEndOfMediaItems = activo
+            }
+        }
+        scope.launch {
+            // Cumplido el "al terminar la canción", se apaga solo; si no, el
+            // reproductor se quedaría parándose al final de cada pista.
+            SleepTimer.alTerminarPista.collectLatest { activo ->
+                if (!activo) return@collectLatest
+                esperarAlFinalDeLaPista(player)
+                player.pauseAtEndOfMediaItems = false
+                SleepTimer.cancelar()
+            }
+        }
+    }
+
+    /** Espera a que el reproductor se pare por haber llegado al final de la pista. */
+    private suspend fun esperarAlFinalDeLaPista(player: ExoPlayer) {
+        var listener: Player.Listener? = null
+        try {
+            suspendCancellableCoroutine { cont ->
+                val suyo = object : Player.Listener {
+                    override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+                        // Solo cuenta el final de la pista: si se pausa a mano, el
+                        // temporizador sigue puesto para cuando se reanude.
+                        val finDePista =
+                            reason == Player.PLAY_WHEN_READY_CHANGE_REASON_END_OF_MEDIA_ITEM
+                        if (!playWhenReady && finDePista && cont.isActive) cont.resume(Unit) {}
+                    }
+                }
+                listener = suyo
+                player.addListener(suyo)
+            }
+        } finally {
+            listener?.let { player.removeListener(it) }
+        }
     }
 
     private val widgetListener = object : Player.Listener {

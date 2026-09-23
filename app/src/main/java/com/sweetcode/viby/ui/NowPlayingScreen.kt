@@ -74,6 +74,8 @@ import com.sweetcode.viby.model.Song
 import coil.compose.AsyncImage
 import com.sweetcode.viby.ui.components.AlbumArt
 import com.sweetcode.viby.ui.components.AudioCover
+import com.sweetcode.viby.ui.components.AvisoTemporizador
+import com.sweetcode.viby.ui.components.BotonTemporizador
 import com.sweetcode.viby.ui.theme.VibyPalette
 import com.sweetcode.viby.ui.theme.rememberVibyPalette
 import kotlin.math.roundToInt
@@ -177,6 +179,7 @@ fun NowPlayingScreen(
                         )
                     }
                 }
+                BotonTemporizador(paleta.acento)
                 IconButton(onClick = onOpenEqualizer) {
                     Icon(
                         Icons.Rounded.Equalizer,
@@ -192,6 +195,8 @@ fun NowPlayingScreen(
                     )
                 }
             }
+
+            AvisoTemporizador(paleta.acento)
 
             // En horizontal la carátula cuadrada a todo el ancho no cabe de alto:
             // en una tablet apaisada empuja controles y texto fuera de pantalla.
