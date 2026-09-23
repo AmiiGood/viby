@@ -13,6 +13,7 @@ import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.ListenableFuture
 import com.google.common.util.concurrent.MoreExecutors
+import com.sweetcode.viby.data.ArtistImages
 import com.sweetcode.viby.data.MusicRepository
 import com.sweetcode.viby.model.Song
 import com.sweetcode.viby.model.Station
@@ -27,6 +28,12 @@ import kotlinx.coroutines.launch
 class PlayerViewModel(app: Application) : AndroidViewModel(app) {
 
     private val repo = MusicRepository(app)
+
+    /** Carpeta de música elegida; es donde se guardan las fotos de artista. */
+    val carpetaRaiz: Uri? get() = repo.savedFolderUri()
+
+    /** Resuelve (y descarga una vez) las fotos de artista. */
+    val artistImages = ArtistImages(app)
 
     private val _songs = MutableStateFlow<List<Song>>(emptyList())
     val songs: StateFlow<List<Song>> = _songs.asStateFlow()

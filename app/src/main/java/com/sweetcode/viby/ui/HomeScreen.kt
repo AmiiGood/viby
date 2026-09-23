@@ -1,5 +1,6 @@
 package com.sweetcode.viby.ui
 
+import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -27,6 +28,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -59,6 +61,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -68,12 +71,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import coil.compose.AsyncImage
+import com.sweetcode.viby.data.ArtistImages
 import com.sweetcode.viby.model.Song
 import com.sweetcode.viby.ui.components.AlbumArt
 import com.sweetcode.viby.ui.components.MiniPlayer
@@ -292,7 +298,9 @@ fun HomeScreen(
                         }
 
                         Tab.ALBUMS -> AlbumList(songs, onOpenAlbum)
-                        Tab.ARTISTS -> ArtistList(songs, onOpenArtist)
+                        Tab.ARTISTS -> ArtistList(
+                            songs, onOpenArtist, vm.carpetaRaiz, vm.artistImages,
+                        )
                         Tab.FAVORITES -> {
                             val favSongs = remember(songs, favorites) {
                                 songs.filter { it.id in favorites }
@@ -392,7 +400,12 @@ private fun AlbumList(songs: List<Song>, onOpenAlbum: (String) -> Unit) {
 }
 
 @Composable
-private fun ArtistList(songs: List<Song>, onOpenArtist: (String) -> Unit) {
+private fun ArtistList(
+    songs: List<Song>,
+    onOpenArtist: (String) -> Unit,
+    raiz: Uri?,
+    imagenes: ArtistImages,
+) {
     val artists = remember(songs) {
         songs.groupBy { it.artist }
             .map { (name, list) -> name to list.size }
@@ -406,14 +419,7 @@ private fun ArtistList(songs: List<Song>, onOpenArtist: (String) -> Unit) {
                     .padding(vertical = 12.dp, horizontal = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Box(
-                    Modifier.size(52.dp).clip(RoundedCornerShape(26.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(Icons.Rounded.Person, contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
+                FotoDeArtista(name, raiz, imagenes)
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
                     Text(name, maxLines = 1, overflow = TextOverflow.Ellipsis,
@@ -479,6 +485,40 @@ private fun CenteredMessage(title: String, subtitle: String, buttonText: String,
             Icon(Icons.Rounded.FolderOpen, contentDescription = null)
             Spacer(Modifier.width(8.dp))
             Text(buttonText)
+        }
+    }
+}
+
+/**
+ * Foto del artista. Se resuelve fuera del hilo principal y solo una vez por
+ * nombre: la primera vez se descarga y se guarda en su carpeta, después ya está.
+ *
+ * Mientras no haya foto se deja el icono de siempre, así que la lista sigue
+ * funcionando sin conexión y sin esperas.
+ */
+@Composable
+private fun FotoDeArtista(nombre: String, raiz: Uri?, imagenes: ArtistImages) {
+    val foto by produceState<Uri?>(initialValue = null, nombre, raiz) {
+        value = raiz?.let { imagenes.deArtista(nombre, it) }
+    }
+    Box(
+        Modifier.size(52.dp).clip(CircleShape)
+            .background(MaterialTheme.colorScheme.surfaceVariant),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (foto != null) {
+            AsyncImage(
+                model = foto,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+        } else {
+            Icon(
+                Icons.Rounded.Person,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
