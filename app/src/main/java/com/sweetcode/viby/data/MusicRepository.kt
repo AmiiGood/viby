@@ -212,6 +212,29 @@ class MusicRepository(private val context: Context) {
         prefs.edit().putStringSet(KEY_FAV, ids).apply()
     }
 
+    // ---- Artistas unidos a mano ----
+
+    /**
+     * Uniones que ha hecho el usuario, como clave-origen -> clave-destino.
+     *
+     * Hay artistas que son el mismo y no hay forma de saberlo mirando el nombre
+     * (Panda y PXNDX, Snoop Dogg y Snoop Lion). Se guardan aquí en vez de tocar
+     * las etiquetas de los archivos, para que se pueda deshacer.
+     */
+    fun loadArtistAliases(): Map<String, String> =
+        prefs.getStringSet(KEY_ALIAS, emptySet()).orEmpty()
+            .mapNotNull { entrada ->
+                val partes = entrada.split(SEPARADOR_ALIAS, limit = 2)
+                if (partes.size == 2 && partes.all { it.isNotEmpty() }) partes[0] to partes[1] else null
+            }
+            .toMap()
+
+    fun saveArtistAliases(alias: Map<String, String>) {
+        prefs.edit()
+            .putStringSet(KEY_ALIAS, alias.map { "${it.key}$SEPARADOR_ALIAS${it.value}" }.toSet())
+            .apply()
+    }
+
     // ---- Modos de reproducción (aleatorio / repetir) ----
 
     fun saveShuffle(on: Boolean) = prefs.edit().putBoolean(KEY_SHUFFLE, on).apply()
@@ -228,6 +251,10 @@ class MusicRepository(private val context: Context) {
         private const val KEY_FAV = "favorites"
         private const val KEY_SHUFFLE = "pb_shuffle"
         private const val KEY_REPEAT = "pb_repeat"
+        private const val KEY_ALIAS = "artist_aliases"
+
+        /** Las claves son alfanuméricas, así que no puede aparecer dentro de una. */
+        private const val SEPARADOR_ALIAS = ">"
         private val AUDIO_EXT = setOf("mp3", "flac", "m4a", "aac", "ogg", "wav", "wma", "opus")
     }
 }

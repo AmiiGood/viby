@@ -11,6 +11,8 @@ data class Artista(
     /** Clave estable para navegar y comparar. */
     val clave: String,
     val canciones: List<Song>,
+    /** Otros nombres que el usuario unió a este, para poder mostrarlos y deshacerlo. */
+    val unidos: List<String> = emptyList(),
 )
 
 /**
@@ -73,27 +75,83 @@ object ArtistNames {
      * Una canción de "A feat. B" aparece bajo A y bajo B, como en cualquier
      * servicio de streaming.
      */
-    fun agrupar(songs: List<Song>): List<Artista> {
+    fun agrupar(songs: List<Song>, alias: Map<String, String> = emptyMap()): List<Artista> {
+        val porId = songs.associateBy { it.id }
+        return agruparEtiquetas(songs.map { it.id to it.artist }, alias).map { g ->
+            Artista(
+                nombre = g.nombre,
+                clave = g.clave,
+                canciones = g.ids.mapNotNull { porId[it] },
+                unidos = g.unidos,
+            )
+        }
+    }
+
+    /** Un artista ya resuelto, antes de volver a colgarle sus canciones. */
+    data class Grupo(
+        val nombre: String,
+        val clave: String,
+        val unidos: List<String>,
+        val ids: List<String>,
+    )
+
+    /**
+     * El núcleo: agrupa pares (id, etiqueta de artista). Separado de [Song] porque
+     * aquí está toda la decisión y así se puede probar sin Android de por medio.
+     */
+    fun agruparEtiquetas(
+        entradas: List<Pair<String, String>>,
+        alias: Map<String, String> = emptyMap(),
+    ): List<Grupo> {
         // Primero, quiénes existen por su cuenta. Un nombre cuenta como conocido
         // cuando aparece sin separadores ambiguos, es decir, cuando la biblioteca
         // lo presenta como artista por sí solo en alguna canción.
-        val conocidos = conocidos(songs.map { it.artist })
+        val conocidos = conocidos(entradas.map { it.second })
 
-        val porClave = LinkedHashMap<String, MutableList<Song>>()
+        val porClave = LinkedHashMap<String, MutableList<String>>()
+        // Las variantes se guardan por su clave original, no por la del destino:
+        // el nombre que se muestra sale de las etiquetas que son suyas de verdad,
+        // no de las que el usuario le unió.
         val variantes = HashMap<String, MutableList<String>>()
-        for (song in songs) {
-            for (nombre in separar(song.artist, conocidos)) {
-                val k = clave(nombre)
-                if (k.isEmpty()) continue
+        val unidosA = HashMap<String, LinkedHashSet<String>>()
+        for ((id, etiqueta) in entradas) {
+            for (nombre in separar(etiqueta, conocidos)) {
+                val propia = clave(nombre)
+                if (propia.isEmpty()) continue
+                val k = destino(propia, alias)
                 val lista = porClave.getOrPut(k) { mutableListOf() }
-                if (lista.none { it.id == song.id }) lista += song
-                variantes.getOrPut(k) { mutableListOf() } += nombre
+                if (id !in lista) lista += id
+                if (k == propia) {
+                    variantes.getOrPut(k) { mutableListOf() } += nombre
+                } else {
+                    unidosA.getOrPut(k) { LinkedHashSet() } += nombre
+                }
             }
         }
 
-        return porClave.map { (k, canciones) ->
-            Artista(nombre = mejorVariante(variantes[k].orEmpty()), clave = k, canciones = canciones)
+        return porClave.map { (k, ids) ->
+            Grupo(
+                // Si solo quedan nombres unidos (el destino no tiene etiquetas
+                // propias) se usa el primero de ellos antes que enseñar la clave.
+                nombre = mejorVariante(variantes[k] ?: unidosA[k]?.toList().orEmpty()),
+                clave = k,
+                unidos = unidosA[k]?.toList().orEmpty(),
+                ids = ids,
+            )
         }.sortedBy { it.nombre.lowercase(Locale.ROOT) }
+    }
+
+    /**
+     * Sigue la cadena de uniones hasta el artista final.
+     *
+     * Se puede unir A a B y luego B a C; y se corta por si alguna vez quedara un
+     * ciclo guardado, que dejaría esto dando vueltas para siempre.
+     */
+    fun destino(clave: String, alias: Map<String, String>): String {
+        var actual = clave
+        val vistas = HashSet<String>()
+        while (vistas.add(actual)) actual = alias[actual] ?: return actual
+        return actual
     }
 
     /**
@@ -136,6 +194,7 @@ object ArtistNames {
      * que conserva acentos y mayúsculas, que casi siempre es la bien escrita.
      */
     private fun mejorVariante(variantes: List<String>): String =
+        if (variantes.isEmpty()) "" else
         variantes.groupingBy { it }.eachCount().entries
             .sortedWith(
                 compareByDescending<Map.Entry<String, Int>> { it.value }

@@ -26,6 +26,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -43,10 +44,34 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
     private val _songs = MutableStateFlow<List<Song>>(emptyList())
     val songs: StateFlow<List<Song>> = _songs.asStateFlow()
 
+    private val _aliasArtistas = MutableStateFlow(repo.loadArtistAliases())
+
     /** Artistas ya unificados: sin duplicados por escritura ni colaboraciones. */
-    val artistas: StateFlow<List<Artista>> = songs
-        .map { ArtistNames.agrupar(it) }
-        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    val artistas: StateFlow<List<Artista>> = combine(songs, _aliasArtistas) { lista, alias ->
+        ArtistNames.agrupar(lista, alias)
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    /**
+     * Une dos artistas que son el mismo.
+     *
+     * Hay alias que ningún nombre delata (Panda y PXNDX), así que los pone el
+     * usuario. Se guardan en la app, no en las etiquetas: así se deshace.
+     */
+    fun unirArtistas(origen: String, destino: String) {
+        if (origen == destino) return
+        val actual = _aliasArtistas.value
+        // Si el destino apuntaba al origen, se quitaría el suelo a sí mismo.
+        if (ArtistNames.destino(destino, actual) == origen) return
+        _aliasArtistas.value = (actual + (origen to destino))
+            .also { repo.saveArtistAliases(it) }
+    }
+
+    /** Deshace todas las uniones hechas hacia [destino]. */
+    fun separarArtistas(destino: String) {
+        _aliasArtistas.value = _aliasArtistas.value
+            .filterValues { it != destino }
+            .also { repo.saveArtistAliases(it) }
+    }
 
     private val _queue = MutableStateFlow<List<Song>>(emptyList())
     val queue: StateFlow<List<Song>> = _queue.asStateFlow()

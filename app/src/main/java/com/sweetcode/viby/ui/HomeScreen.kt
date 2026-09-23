@@ -7,8 +7,10 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
@@ -44,6 +46,7 @@ import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Radio
 import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -55,6 +58,7 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
@@ -302,6 +306,8 @@ fun HomeScreen(
                         Tab.ALBUMS -> AlbumList(songs, onOpenAlbum)
                         Tab.ARTISTS -> ArtistList(
                             artistas, onOpenArtist, vm.carpetaRaiz, vm.artistImages,
+                            onUnir = vm::unirArtistas,
+                            onSeparar = vm::separarArtistas,
                         )
                         Tab.FAVORITES -> {
                             val favSongs = remember(songs, favorites) {
@@ -402,19 +408,29 @@ private fun AlbumList(songs: List<Song>, onOpenAlbum: (String) -> Unit) {
 }
 
 @Composable
+@OptIn(ExperimentalFoundationApi::class)
 private fun ArtistList(
     artists: List<Artista>,
     onOpenArtist: (String) -> Unit,
     raiz: Uri?,
     imagenes: ArtistImages,
+    onUnir: (String, String) -> Unit,
+    onSeparar: (String) -> Unit,
 ) {
+    // Artista sobre el que se mantuvo pulsado, si hay menú abierto.
+    var menuDe by remember { mutableStateOf<Artista?>(null) }
+    var uniendo by remember { mutableStateOf<Artista?>(null) }
+
     LazyColumn(contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)) {
         items(artists, key = { it.clave }) { artista ->
             val name = artista.nombre
             val count = artista.canciones.size
             Row(
                 modifier = Modifier.fillMaxWidth()
-                    .clickable { onOpenArtist(artista.clave) }
+                    .combinedClickable(
+                        onClick = { onOpenArtist(artista.clave) },
+                        onLongClick = { menuDe = artista },
+                    )
                     .padding(vertical = 12.dp, horizontal = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -423,12 +439,107 @@ private fun ArtistList(
                 Column(Modifier.weight(1f)) {
                     Text(name, maxLines = 1, overflow = TextOverflow.Ellipsis,
                         fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
-                    Text("$count canciones", style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        // Cuando hay artistas unidos se dice cuáles, para que no
+                        // parezca que las canciones salieron de la nada.
+                        if (artista.unidos.isEmpty()) "$count canciones"
+                        else "$count canciones · con ${artista.unidos.joinToString(", ")}",
+                        style = MaterialTheme.typography.bodySmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
         }
     }
+
+    menuDe?.let { artista ->
+        MenuDeArtista(
+            artista = artista,
+            onUnirCon = { menuDe = null; uniendo = artista },
+            onSeparar = { menuDe = null; onSeparar(artista.clave) },
+            onCerrar = { menuDe = null },
+        )
+    }
+
+    uniendo?.let { artista ->
+        ElegirArtista(
+            origen = artista,
+            candidatos = artists.filter { it.clave != artista.clave },
+            onElegido = { destino -> uniendo = null; onUnir(artista.clave, destino.clave) },
+            onCerrar = { uniendo = null },
+        )
+    }
+}
+
+/** Qué se puede hacer con un artista al mantenerlo pulsado. */
+@Composable
+private fun MenuDeArtista(
+    artista: Artista,
+    onUnirCon: () -> Unit,
+    onSeparar: () -> Unit,
+    onCerrar: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onCerrar,
+        title = { Text(artista.nombre) },
+        text = {
+            Column {
+                TextButton(onClick = onUnirCon, modifier = Modifier.fillMaxWidth()) {
+                    Text("Unir con otro artista", modifier = Modifier.weight(1f))
+                }
+                if (artista.unidos.isNotEmpty()) {
+                    TextButton(onClick = onSeparar, modifier = Modifier.fillMaxWidth()) {
+                        Text("Separar ${artista.unidos.joinToString(", ")}",
+                            modifier = Modifier.weight(1f))
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onCerrar) { Text("Cerrar") } },
+    )
+}
+
+/**
+ * Elige con qué artista unir. El elegido es el que se queda: su nombre es el que
+ * se ve después, porque el usuario lo está señalando como el bueno.
+ */
+@Composable
+private fun ElegirArtista(
+    origen: Artista,
+    candidatos: List<Artista>,
+    onElegido: (Artista) -> Unit,
+    onCerrar: () -> Unit,
+) {
+    var filtro by remember { mutableStateOf("") }
+    val visibles = remember(filtro, candidatos) {
+        if (filtro.isBlank()) candidatos
+        else candidatos.filter { it.nombre.contains(filtro, ignoreCase = true) }
+    }
+    AlertDialog(
+        onDismissRequest = onCerrar,
+        title = { Text("Unir ${origen.nombre} con…") },
+        text = {
+            Column {
+                SearchField(filtro, { filtro = it })
+                Spacer(Modifier.height(8.dp))
+                LazyColumn(Modifier.height(320.dp)) {
+                    items(visibles, key = { it.clave }) { candidato ->
+                        Text(
+                            candidato.nombre,
+                            modifier = Modifier.fillMaxWidth()
+                                .clickable { onElegido(candidato) }
+                                .padding(vertical = 14.dp, horizontal = 4.dp),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onCerrar) { Text("Cancelar") } },
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
