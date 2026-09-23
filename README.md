@@ -7,9 +7,9 @@ descubrir y descargar canciones nuevas desde la propia app.
 
 > Proyecto personal. Uso sideload (no Play Store).
 
-| Biblioteca | Radio | Reproduciendo |
-|:---:|:---:|:---:|
-| ![Biblioteca](docs/capturas/biblioteca.png) | ![Radio](docs/capturas/radio.png) | ![Reproduciendo](docs/capturas/reproduciendo.png) |
+| Biblioteca | Artistas | Reproduciendo | Radio |
+|:---:|:---:|:---:|:---:|
+| ![Biblioteca](docs/capturas/biblioteca.png) | ![Artistas](docs/capturas/artistas.png) | ![Reproduciendo](docs/capturas/reproduciendo.png) | ![Radio](docs/capturas/radio.png) |
 
 ## Qué hace
 
@@ -20,11 +20,19 @@ descubrir y descargar canciones nuevas desde la propia app.
   selector de salida de audio del sistema.
 - **Navegación por pestañas** en la cabecera: Canciones · Álbumes · Artistas · Favoritos.
   La canción en curso se marca con barras de nivel animadas, que se congelan al pausar.
+- **Artistas con foto**, descargada una sola vez y guardada como `artist.jpg` en la
+  carpeta del artista: sobrevive a reinstalar la app y viaja con la música. Los nombres
+  se unifican (mayúsculas, acentos, artículo inicial) y las colaboraciones cuentan para
+  los dos, sin partir a grupos como AC/DC o Earth, Wind & Fire. Para los que son el
+  mismo y no hay forma de deducirlo del nombre (Panda y PXNDX), se mantiene pulsado un
+  artista y se elige con cuál unirlo.
 - **Notificación y pantalla bloqueada** con carátula (Media3 / ExoPlayer).
 - **Ecualizador** integrado.
 - **Reanuda** donde te quedaste y recuerda aleatorio/repetir.
 - **Mini reproductor** con la carátula como disco que gira mientras suena y se detiene al pausar.
-- **Descargas** integradas (NewPipeExtractor): busca, escucha un preview, descarga a
+- **Descargas** integradas (NewPipeExtractor): busca, escucha un preview —que suena en
+  el reproductor de verdad, así que sigue al salir de la pantalla y sale en la
+  notificación—, descarga a
   `Artista/Álbum/Título.m4a` con tags ID3 + carátula (enriquecido con MusicBrainz),
   en segundo plano con notificación de progreso y sin duplicados.
 - **Descubrir**: recomendaciones de música nueva basadas en tu biblioteca.
@@ -38,7 +46,7 @@ descubrir y descargar canciones nuevas desde la propia app.
 
 Kotlin · Jetpack Compose (Material 3) · Media3/ExoPlayer · Coil · Glance (widget) ·
 Palette (color desde la carátula) · NewPipeExtractor · jaudiotagger · MusicBrainz ·
-Radio Browser · iTunes Search (carátulas de radio) · minSdk 26 · targetSdk 36.
+Radio Browser · iTunes Search (carátulas de radio y fotos de artista) · minSdk 26 · targetSdk 36.
 
 ## Compilar
 
