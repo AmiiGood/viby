@@ -16,6 +16,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -68,14 +69,14 @@ private fun VibyApp() {
                 onOpenDiscover = { nav.navigate("discover") },
                 onOpenRadio = { nav.navigate("radio") },
                 onOpenAlbum = { name -> nav.navigate("album/${Uri.encode(name)}") },
-                onOpenArtist = { name -> nav.navigate("artist/${Uri.encode(name)}") },
+                onOpenArtist = { clave -> nav.navigate("artist/${Uri.encode(clave)}") },
             )
         }
         composable("equalizer") {
             EqualizerScreen(onBack = { nav.popBackStack() })
         }
         composable("download") {
-            DownloadScreen(onBack = { nav.popBackStack() })
+            DownloadScreen(player = vm, onBack = { nav.popBackStack() })
         }
         composable("radio") {
             val state by vm.uiState.collectAsStateWithLifecycle()
@@ -99,6 +100,7 @@ private fun VibyApp() {
             DiscoverScreen(
                 songs = songs,
                 favorites = favorites,
+                player = vm,
                 onBack = { nav.popBackStack() },
             )
         }
@@ -117,9 +119,16 @@ private fun VibyApp() {
             val name = Uri.decode(entry.arguments?.getString("name").orEmpty())
             DetailContent(vm, name, onBack = { nav.popBackStack() }) { it.album == name }
         }
-        composable("artist/{name}") { entry ->
-            val name = Uri.decode(entry.arguments?.getString("name").orEmpty())
-            DetailContent(vm, name, onBack = { nav.popBackStack() }) { it.artist == name }
+        composable("artist/{clave}") { entry ->
+            // Se navega por clave, no por el nombre de la etiqueta: el artista puede
+            // estar escrito de varias formas y sus canciones vienen ya agrupadas.
+            val clave = Uri.decode(entry.arguments?.getString("clave").orEmpty())
+            val artistas by vm.artistas.collectAsStateWithLifecycle()
+            val artista = artistas.firstOrNull { it.clave == clave }
+            val suyas = remember(artista) { artista?.canciones?.mapTo(HashSet()) { it.id }.orEmpty() }
+            DetailContent(vm, artista?.nombre ?: clave, onBack = { nav.popBackStack() }) {
+                it.id in suyas
+            }
         }
     }
 }

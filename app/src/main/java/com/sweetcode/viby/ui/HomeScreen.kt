@@ -80,6 +80,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.sweetcode.viby.data.ArtistImages
+import com.sweetcode.viby.data.Artista
 import com.sweetcode.viby.model.Song
 import com.sweetcode.viby.ui.components.AlbumArt
 import com.sweetcode.viby.ui.components.MiniPlayer
@@ -108,6 +109,7 @@ fun HomeScreen(
     onOpenArtist: (String) -> Unit,
 ) {
     val songs by vm.songs.collectAsStateWithLifecycle()
+    val artistas by vm.artistas.collectAsStateWithLifecycle()
     val state by vm.uiState.collectAsStateWithLifecycle()
     val favorites by vm.favorites.collectAsStateWithLifecycle()
     val queue by vm.queue.collectAsStateWithLifecycle()
@@ -258,7 +260,7 @@ fun HomeScreen(
                                 state.positionMs.toFloat() / state.durationMs else null,
                             // Una emisora no tiene caratula embebida que extraer: el
                             // servicio resuelve su portada (o su logo) a un fichero.
-                            artworkUrl = state.artworkUri?.takeIf { state.currentStation != null }
+                            artworkUrl = state.artworkUri?.takeIf { state.currentStation != null || state.previewUrl != null }
                                 ?.toString(),
                             onExpand = { settle(true) },
                             onPlayPause = vm::togglePlay,
@@ -299,7 +301,7 @@ fun HomeScreen(
 
                         Tab.ALBUMS -> AlbumList(songs, onOpenAlbum)
                         Tab.ARTISTS -> ArtistList(
-                            songs, onOpenArtist, vm.carpetaRaiz, vm.artistImages,
+                            artistas, onOpenArtist, vm.carpetaRaiz, vm.artistImages,
                         )
                         Tab.FAVORITES -> {
                             val favSongs = remember(songs, favorites) {
@@ -401,21 +403,18 @@ private fun AlbumList(songs: List<Song>, onOpenAlbum: (String) -> Unit) {
 
 @Composable
 private fun ArtistList(
-    songs: List<Song>,
+    artists: List<Artista>,
     onOpenArtist: (String) -> Unit,
     raiz: Uri?,
     imagenes: ArtistImages,
 ) {
-    val artists = remember(songs) {
-        songs.groupBy { it.artist }
-            .map { (name, list) -> name to list.size }
-            .sortedBy { it.first.lowercase() }
-    }
     LazyColumn(contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)) {
-        items(artists, key = { it.first }) { (name, count) ->
+        items(artists, key = { it.clave }) { artista ->
+            val name = artista.nombre
+            val count = artista.canciones.size
             Row(
                 modifier = Modifier.fillMaxWidth()
-                    .clickable { onOpenArtist(name) }
+                    .clickable { onOpenArtist(artista.clave) }
                     .padding(vertical = 12.dp, horizontal = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {

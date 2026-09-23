@@ -37,11 +37,12 @@ import com.sweetcode.viby.ui.components.VibyTopBar
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DownloadScreen(onBack: () -> Unit) {
+fun DownloadScreen(player: PlayerViewModel, onBack: () -> Unit) {
     val vm: DownloadViewModel = viewModel()
     val state by vm.state.collectAsStateWithLifecycle()
     val downloads by vm.downloads.collectAsStateWithLifecycle()
     val preview by vm.preview.collectAsStateWithLifecycle()
+    val reproduciendo by player.uiState.collectAsStateWithLifecycle()
     var query by remember { mutableStateOf("") }
     val focusManager = LocalFocusManager.current
 
@@ -85,13 +86,26 @@ fun DownloadScreen(onBack: () -> Unit) {
                 }
                 else -> LazyColumn(contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)) {
                     items(state.results, key = { it.url }) { result ->
-                        val isThis = preview.url == result.url
+                        // "Este" es el que suena ahora en el reproductor de la app,
+                        // no el que esta pantalla esté reproduciendo por su cuenta.
+                        val isThis = reproduciendo.previewUrl == result.url
                         DownloadResultRow(
                             result = result,
                             status = downloads[result.url],
-                            previewPlaying = isThis && preview.isPlaying,
-                            previewLoading = isThis && preview.isLoading,
-                            onPreview = { vm.togglePreview(result) },
+                            previewPlaying = isThis && reproduciendo.isPlaying,
+                            previewLoading = preview.url == result.url && preview.isLoading,
+                            onPreview = {
+                                if (isThis) player.togglePlay()
+                                else vm.abrirPreview(result) { url ->
+                                    player.playStream(
+                                        url = result.url,
+                                        title = result.title,
+                                        artist = result.uploader,
+                                        streamUrl = url,
+                                        artworkUrl = result.thumbnailUrl,
+                                    )
+                                }
+                            },
                             onDownload = { vm.download(result) },
                         )
                     }

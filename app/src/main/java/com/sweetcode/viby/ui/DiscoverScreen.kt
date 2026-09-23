@@ -37,12 +37,14 @@ import com.sweetcode.viby.ui.components.VibyTopBar
 fun DiscoverScreen(
     songs: List<Song>,
     favorites: Set<String>,
+    player: PlayerViewModel,
     onBack: () -> Unit,
 ) {
     val vm: DownloadViewModel = viewModel()
     val state by vm.state.collectAsStateWithLifecycle()
     val downloads by vm.downloads.collectAsStateWithLifecycle()
     val preview by vm.preview.collectAsStateWithLifecycle()
+    val reproduciendo by player.uiState.collectAsStateWithLifecycle()
 
     var refreshKey by remember { mutableIntStateOf(0) }
 
@@ -92,13 +94,26 @@ fun DiscoverScreen(
                 }
                 else -> LazyColumn(contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)) {
                     items(state.results, key = { it.url }) { result ->
-                        val isThis = preview.url == result.url
+                        // "Este" es el que suena ahora en el reproductor de la app,
+                        // no el que esta pantalla esté reproduciendo por su cuenta.
+                        val isThis = reproduciendo.previewUrl == result.url
                         DownloadResultRow(
                             result = result,
                             status = downloads[result.url],
-                            previewPlaying = isThis && preview.isPlaying,
-                            previewLoading = isThis && preview.isLoading,
-                            onPreview = { vm.togglePreview(result) },
+                            previewPlaying = isThis && reproduciendo.isPlaying,
+                            previewLoading = preview.url == result.url && preview.isLoading,
+                            onPreview = {
+                                if (isThis) player.togglePlay()
+                                else vm.abrirPreview(result) { url ->
+                                    player.playStream(
+                                        url = result.url,
+                                        title = result.title,
+                                        artist = result.uploader,
+                                        streamUrl = url,
+                                        artworkUrl = result.thumbnailUrl,
+                                    )
+                                }
+                            },
                             onDownload = { vm.download(result) },
                         )
                     }

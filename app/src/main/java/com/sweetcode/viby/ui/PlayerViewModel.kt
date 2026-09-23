@@ -14,6 +14,8 @@ import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.ListenableFuture
 import com.google.common.util.concurrent.MoreExecutors
 import com.sweetcode.viby.data.ArtistImages
+import com.sweetcode.viby.data.ArtistNames
+import com.sweetcode.viby.data.Artista
 import com.sweetcode.viby.data.MusicRepository
 import com.sweetcode.viby.model.Song
 import com.sweetcode.viby.model.Station
@@ -21,8 +23,11 @@ import com.sweetcode.viby.playback.PlaybackService
 import com.sweetcode.viby.radio.StationRepository
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 class PlayerViewModel(app: Application) : AndroidViewModel(app) {
@@ -37,6 +42,11 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
 
     private val _songs = MutableStateFlow<List<Song>>(emptyList())
     val songs: StateFlow<List<Song>> = _songs.asStateFlow()
+
+    /** Artistas ya unificados: sin duplicados por escritura ni colaboraciones. */
+    val artistas: StateFlow<List<Artista>> = songs
+        .map { ArtistNames.agrupar(it) }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     private val _queue = MutableStateFlow<List<Song>>(emptyList())
     val queue: StateFlow<List<Song>> = _queue.asStateFlow()
@@ -56,6 +66,10 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
     val favorites: StateFlow<Set<String>> = _favorites.asStateFlow()
 
     private var songById: Map<String, Song> = emptyMap()
+
+    // Preview de descargas sonando ahora. Como la emisora, no está en songById y
+    // hay que guardarlo para poder describir lo que suena.
+    private var previewSong: Song? = null
 
     // Emisora sonando ahora, o null si suena la biblioteca. Manda sobre currentSong.
     private var playingStation: Station? = null
@@ -201,6 +215,46 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
         syncFromPlayer()
     }
 
+    /**
+     * Reproduce algo que no está en la biblioteca: el preview en streaming de un
+     * resultado de descargas.
+     *
+     * Va por el mismo servicio que el resto, no por un reproductor aparte. Así el
+     * preview es reproducción de verdad: sigue sonando al salir de la pantalla,
+     * sale en el mini reproductor, en la notificación y en la pantalla de bloqueo,
+     * y se corta si empiezas otra cosa en vez de solaparse.
+     */
+    fun playStream(url: String, title: String, artist: String, streamUrl: String, artworkUrl: String?) {
+        val c = controller ?: return
+        playingStation = null
+        baseOrder = emptyList()
+        _queue.value = emptyList()
+        val id = idDePreview(url)
+        previewSong = Song(
+            id = id,
+            uri = Uri.parse(streamUrl),
+            title = title,
+            artist = artist,
+            album = "",
+            durationMs = 0L,
+        )
+        val item = MediaItem.Builder()
+            .setUri(streamUrl)
+            .setMediaId(id)
+            .setMediaMetadata(
+                MediaMetadata.Builder()
+                    .setTitle(title)
+                    .setArtist(artist)
+                    .setArtworkUri(artworkUrl?.let(Uri::parse))
+                    .build(),
+            )
+            .build()
+        c.setMediaItems(listOf(item), 0, 0L)
+        c.prepare()
+        c.play()
+        syncFromPlayer()
+    }
+
     fun togglePlay() {
         val c = controller ?: return
         if (c.isPlaying) c.pause() else c.play()
@@ -321,11 +375,14 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
         val liveTitle = station?.let { s ->
             c.mediaMetadata.title?.toString()?.takeIf { it.isNotBlank() && it != s.name }
         }
+        val preview = previewDelReproductor(c)
         val current = station?.asSong(liveTitle)
+            ?: preview
             ?: _queue.value.getOrNull(c.currentMediaItemIndex)
             ?: songById[c.currentMediaItem?.mediaId]
         _uiState.value = _uiState.value.copy(
             currentStation = station,
+            previewUrl = preview?.id?.removePrefix(PREFIJO_PREVIEW),
             // La pone el servicio: logo de la emisora primero y, en cuanto se
             // sabe que suena, la portada del disco.
             artworkUri = c.mediaMetadata.artworkUri,
@@ -337,6 +394,26 @@ class PlayerViewModel(app: Application) : AndroidViewModel(app) {
             repeatMode = c.repeatMode,
             // shuffleEnabled lo manejamos nosotros (no se lee del player).
         )
+    }
+
+    /**
+     * El preview que suena, si es que suena uno.
+     *
+     * Si el proceso murió y volvió, [previewSong] se perdió pero el servicio sigue
+     * sonando, así que se reconstruye con lo que el propio reproductor sabe.
+     */
+    private fun previewDelReproductor(c: MediaController): Song? {
+        val id = c.currentMediaItem?.mediaId ?: return null
+        if (!id.startsWith(PREFIJO_PREVIEW)) return null
+        previewSong?.takeIf { it.id == id }?.let { return it }
+        return Song(
+            id = id,
+            uri = c.currentMediaItem?.localConfiguration?.uri ?: Uri.EMPTY,
+            title = c.mediaMetadata.title?.toString().orEmpty(),
+            artist = c.mediaMetadata.artist?.toString().orEmpty(),
+            album = "",
+            durationMs = 0L,
+        ).also { previewSong = it }
     }
 
     private fun rebuildQueue() {
@@ -412,6 +489,8 @@ data class PlayerUiState(
     val currentSong: Song? = null,
     /** No null mientras suena una emisora: la UI esconde progreso, seek y cola. */
     val currentStation: Station? = null,
+    /** URL del resultado de descargas que suena, para marcar su fila en la lista. */
+    val previewUrl: String? = null,
     /** Caratula resuelta para lo que suena. Solo util en radio: una cancion
      *  local lleva la suya embebida y se extrae del propio archivo. */
     val artworkUri: Uri? = null,
@@ -464,3 +543,8 @@ private fun Station.toMediaItem(): MediaItem =
                 .build()
         )
         .build()
+
+/** Los preview no están en la biblioteca; el prefijo los distingue por su mediaId. */
+private const val PREFIJO_PREVIEW = "preview:"
+
+private fun idDePreview(url: String) = PREFIJO_PREVIEW + url

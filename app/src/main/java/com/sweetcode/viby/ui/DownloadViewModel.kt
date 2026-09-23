@@ -3,11 +3,6 @@ package com.sweetcode.viby.ui
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.media3.common.AudioAttributes
-import androidx.media3.common.C
-import androidx.media3.common.MediaItem
-import androidx.media3.common.Player
-import androidx.media3.exoplayer.ExoPlayer
 import com.sweetcode.viby.download.DownloadProgress
 import com.sweetcode.viby.download.DownloadRepository
 import com.sweetcode.viby.download.DownloadService
@@ -25,10 +20,14 @@ data class SearchUiState(
     val error: String? = null,
 )
 
-/** Estado del preview en streaming (la canción que se está escuchando antes de bajar). */
+/**
+ * Resultado cuyo audio se está resolviendo ahora mismo.
+ *
+ * Solo la espera: reproducir es cosa del reproductor de la app, no de esta
+ * pantalla, así que si algo suena o no se lee de su estado.
+ */
 data class PreviewState(
     val url: String? = null,
-    val isPlaying: Boolean = false,
     val isLoading: Boolean = false,
 )
 
@@ -45,8 +44,6 @@ class DownloadViewModel(app: Application) : AndroidViewModel(app) {
     private val _preview = MutableStateFlow(PreviewState())
     val preview: StateFlow<PreviewState> = _preview.asStateFlow()
 
-    private var previewPlayer: ExoPlayer? = null
-    private var previewUrl: String? = null
 
     fun search(query: String) {
         if (query.isBlank()) return
@@ -95,60 +92,29 @@ class DownloadViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Reproduce/pausa el preview en streaming del resultado. */
-    fun togglePreview(result: SearchResult) {
-        val player = getOrCreatePlayer()
-        if (previewUrl == result.url) {
-            if (player.isPlaying) player.pause() else player.play()
-            return
-        }
-        previewUrl = result.url
+    /**
+     * Resuelve el audio del resultado y se lo entrega al reproductor de la app.
+     *
+     * Antes esto sonaba en un ExoPlayer propio del ViewModel, y por eso el preview
+     * se cortaba al salir de la pantalla y no salía en ningún sitio. Resolver la
+     * URL sigue siendo cosa nuestra; reproducirla, no.
+     */
+    fun abrirPreview(result: SearchResult, reproducir: (String) -> Unit) {
+        if (_preview.value.url == result.url) return
         _preview.value = PreviewState(url = result.url, isLoading = true)
         viewModelScope.launch {
             val streamUrl = runCatching { repo.resolveAudioUrl(result.url) }.getOrNull()
-            if (streamUrl == null || previewUrl != result.url) {
-                if (previewUrl == result.url) {
-                    _preview.value = PreviewState()
-                    previewUrl = null
-                }
+            // Si mientras tanto se pidió otro, el que manda es el otro.
+            if (_preview.value.url != result.url) return@launch
+            _preview.value = PreviewState()
+            if (streamUrl == null) {
+                _state.update { it.copy(error = "No se pudo reproducir este resultado.") }
                 return@launch
             }
-            player.setMediaItem(MediaItem.fromUri(streamUrl))
-            player.prepare()
-            player.play()
+            reproducir(streamUrl)
         }
     }
 
-    private fun getOrCreatePlayer(): ExoPlayer {
-        previewPlayer?.let { return it }
-        return ExoPlayer.Builder(getApplication())
-            .setAudioAttributes(
-                AudioAttributes.Builder()
-                    .setUsage(C.USAGE_MEDIA)
-                    .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
-                    .build(),
-                /* handleAudioFocus = */ true, // pausa la música principal mientras escuchas el preview
-            )
-            .build()
-            .also { player ->
-                player.addListener(object : Player.Listener {
-                    override fun onIsPlayingChanged(isPlaying: Boolean) {
-                        _preview.update { it.copy(isPlaying = isPlaying) }
-                    }
-
-                    override fun onPlaybackStateChanged(state: Int) {
-                        _preview.update { it.copy(isLoading = state == Player.STATE_BUFFERING) }
-                    }
-                })
-                previewPlayer = player
-            }
-    }
-
-    override fun onCleared() {
-        previewPlayer?.release()
-        previewPlayer = null
-        super.onCleared()
-    }
 }
 
 /**

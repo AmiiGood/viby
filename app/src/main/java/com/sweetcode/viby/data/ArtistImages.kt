@@ -11,7 +11,6 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
 import java.net.URLEncoder
-import java.util.Locale
 import java.util.concurrent.TimeUnit
 
 /** Nombre del fichero dentro de la carpeta del artista. */
@@ -83,15 +82,12 @@ class ArtistImages(private val context: Context) {
                 val root = DocumentFile.fromTreeUri(context, raiz) ?: return null
                 carpetas = root.listFiles()
                     .filter { it.isDirectory }
-                    .associateBy { normalizar(it.name ?: "") }
+                    .associateBy { ArtistNames.clave(it.name ?: "") }
                 raizIndexada = raiz
             }
         }
-        return carpetas[normalizar(nombre)]
+        return carpetas[ArtistNames.clave(nombre)]
     }
-
-    private fun normalizar(s: String) =
-        s.lowercase(Locale.ROOT).filter { it.isLetterOrDigit() }
 
     private fun descargar(nombre: String): ByteArray? {
         val q = URLEncoder.encode(nombre, "UTF-8")

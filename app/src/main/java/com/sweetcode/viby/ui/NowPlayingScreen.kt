@@ -97,7 +97,7 @@ fun NowPlayingScreen(
 ) {
     // Una emisora no tiene caratula embebida que extraer de su URL: la portada
     // la resuelve el servicio y llega ya como fichero en artworkUri.
-    val artModel: Any = state.artworkUri?.takeIf { state.currentStation != null }
+    val artModel: Any = state.artworkUri?.takeIf { state.currentStation != null || state.previewUrl != null }
         ?: AudioCover(song.uri)
 
     // El color sale de la carátula: es la idea entera de esta dirección.

@@ -78,7 +78,9 @@ private fun cargarMiniatura(context: Context, songUri: Uri?, artworkUri: Uri?): 
         BitmapFactory.decodeFile(cache.absolutePath, opciones)?.let { return it }
     }
 
-    // 3. Último recurso: extraer la imagen embebida del propio archivo.
+    // 3. Último recurso: extraer la imagen embebida del propio archivo. Solo si
+    // es un fichero: en un stream remoto esto se bajaría medio audio por nada.
+    if (songUri.scheme !in setOf("content", "file")) return null
     return runCatching {
         val r = MediaMetadataRetriever()
         try {
