@@ -31,6 +31,8 @@ import com.sweetcode.viby.ui.DownloadScreen
 import com.sweetcode.viby.ui.EqualizerScreen
 import com.sweetcode.viby.ui.HomeScreen
 import com.sweetcode.viby.ui.PlayerViewModel
+import com.sweetcode.viby.ui.PlaylistScreen
+import com.sweetcode.viby.ui.PlaylistViewModel
 import com.sweetcode.viby.ui.QueueScreen
 import com.sweetcode.viby.ui.RadioScreen
 import com.sweetcode.viby.ui.UpdateViewModel
@@ -76,6 +78,7 @@ private fun VibyApp() {
                 onOpenRadio = { nav.navigate("radio") },
                 onOpenAlbum = { name -> nav.navigate("album/${Uri.encode(name)}") },
                 onOpenArtist = { clave -> nav.navigate("artist/${Uri.encode(clave)}") },
+                onOpenPlaylist = { id -> nav.navigate("playlist/$id") },
             )
         }
         composable("equalizer") {
@@ -124,6 +127,40 @@ private fun VibyApp() {
         composable("album/{name}") { entry ->
             val name = Uri.decode(entry.arguments?.getString("name").orEmpty())
             DetailContent(vm, name, onBack = { nav.popBackStack() }) { it.album == name }
+        }
+        composable("playlist/{id}") { entry ->
+            val id = entry.arguments?.getString("id").orEmpty()
+            val listasVm: PlaylistViewModel = viewModel()
+            val listas by listasVm.listas.collectAsStateWithLifecycle()
+            val lista = listas.firstOrNull { it.id == id }
+            if (lista == null) {
+                // Se borró desde su propia pantalla, o aún no ha cargado el fichero.
+                LaunchedEffect(listas) { if (listas.isNotEmpty()) nav.popBackStack() }
+            } else {
+                val songs by vm.songs.collectAsStateWithLifecycle()
+                val state by vm.uiState.collectAsStateWithLifecycle()
+                val favorites by vm.favorites.collectAsStateWithLifecycle()
+                // Las canciones se resuelven contra la biblioteca actual: si un
+                // archivo ya no está, su entrada simplemente no aparece.
+                val canciones = remember(lista, songs) {
+                    val porId = songs.associateBy { it.id }
+                    lista.canciones.mapNotNull { porId[it] }
+                }
+                PlaylistScreen(
+                    lista = lista,
+                    canciones = canciones,
+                    currentId = state.currentSong?.id,
+                    favorites = favorites,
+                    onBack = { nav.popBackStack() },
+                    onPlay = vm::play,
+                    onShuffle = vm::playShuffled,
+                    onToggleFavorite = vm::toggleFavorite,
+                    onEditar = { nombre, desc -> listasVm.renombrar(id, nombre, desc) },
+                    onPortada = { uri -> listasVm.cambiarPortada(id, uri) },
+                    onQuitar = { songId -> listasVm.quitar(id, songId) },
+                    onBorrar = { listasVm.borrar(id); nav.popBackStack() },
+                )
+            }
         }
         composable("artist/{clave}") { entry ->
             // Se navega por clave, no por el nombre de la etiqueta: el artista puede

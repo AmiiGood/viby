@@ -1,6 +1,7 @@
 package com.sweetcode.viby.ui.components
 
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -26,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import com.sweetcode.viby.model.Song
 
 /** Fila de canción reutilizable, con carátula, título/artista y botón de favorito. */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun SongRow(
     song: Song,
@@ -35,11 +37,13 @@ fun SongRow(
     onToggleFavorite: () -> Unit,
     modifier: Modifier = Modifier,
     isPlaying: Boolean = false,
+    /** Mantener pulsado, para añadir a una lista. Null deja la fila como estaba. */
+    onLongClick: (() -> Unit)? = null,
 ) {
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
             .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

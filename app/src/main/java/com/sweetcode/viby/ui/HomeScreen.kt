@@ -35,6 +35,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Album
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.CloudDownload
@@ -44,6 +45,7 @@ import androidx.compose.material.icons.rounded.FolderOpen
 import androidx.compose.material.icons.rounded.LibraryMusic
 import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.QueueMusic
 import androidx.compose.material.icons.rounded.Radio
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.AlertDialog
@@ -57,6 +59,8 @@ import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
@@ -82,11 +86,15 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.sweetcode.viby.data.ArtistImages
 import com.sweetcode.viby.data.Artista
+import com.sweetcode.viby.model.Playlist
 import com.sweetcode.viby.model.Song
 import com.sweetcode.viby.ui.components.AlbumArt
+import com.sweetcode.viby.ui.components.DialogoAnadirALista
+import com.sweetcode.viby.ui.components.DialogoDeLista
 import com.sweetcode.viby.ui.components.FotoDeArtista
 import com.sweetcode.viby.ui.components.MiniPlayer
 import com.sweetcode.viby.ui.components.SongRow
@@ -99,6 +107,7 @@ private enum class Tab(val label: String, val icon: ImageVector) {
     SONGS("Canciones", Icons.Rounded.MusicNote),
     ALBUMS("Álbumes", Icons.Rounded.Album),
     ARTISTS("Artistas", Icons.Rounded.Person),
+    PLAYLISTS("Listas", Icons.Rounded.QueueMusic),
     FAVORITES("Favoritos", Icons.Rounded.Favorite),
 }
 
@@ -113,7 +122,13 @@ fun HomeScreen(
     onOpenRadio: () -> Unit,
     onOpenAlbum: (String) -> Unit,
     onOpenArtist: (String) -> Unit,
+    onOpenPlaylist: (String) -> Unit,
 ) {
+    val listasVm: PlaylistViewModel = viewModel()
+    val listas by listasVm.listas.collectAsStateWithLifecycle()
+    // Canción que se está guardando en una lista, si hay alguna.
+    var guardando by remember { mutableStateOf<Song?>(null) }
+    val snackbar = remember { SnackbarHostState() }
     val songs by vm.songs.collectAsStateWithLifecycle()
     val artistas by vm.artistas.collectAsStateWithLifecycle()
     val state by vm.uiState.collectAsStateWithLifecycle()
@@ -200,6 +215,11 @@ fun HomeScreen(
         // ===== Pantalla principal (pestañas) =====
         Scaffold(
             containerColor = MaterialTheme.colorScheme.background,
+            // El aviso de "añadida a…" se pone encima del mini reproductor, que es
+            // lo que hay justo debajo cuando algo está sonando.
+            snackbarHost = {
+                SnackbarHost(snackbar, Modifier.padding(bottom = 80.dp))
+            },
             topBar = {
                 Column {
                     VibyTopBar(
@@ -302,7 +322,7 @@ fun HomeScreen(
                                 }
                             }
                             val onPlay = remember(displayed) { fn@{ i: Int -> vm.play(displayed, i) } }
-                            SongList(displayed, state.currentSong?.id, favorites, state.isPlaying, onPlay, onToggleFavorite)
+                            SongList(displayed, state.currentSong?.id, favorites, state.isPlaying, onPlay, onToggleFavorite, onAnadirALista = { guardando = it })
                         }
 
                         Tab.ALBUMS -> AlbumList(songs, onOpenAlbum)
@@ -310,6 +330,11 @@ fun HomeScreen(
                             artistas, onOpenArtist, vm.carpetaRaiz, vm.artistImages,
                             onUnir = vm::unirArtistas,
                             onSeparar = vm::separarArtistas,
+                        )
+                        Tab.PLAYLISTS -> PlaylistList(
+                            listas = listas,
+                            onAbrir = onOpenPlaylist,
+                            onCrear = { nombre -> onOpenPlaylist(listasVm.crear(nombre)) },
                         )
                         Tab.FAVORITES -> {
                             val favSongs = remember(songs, favorites) {
@@ -319,12 +344,35 @@ fun HomeScreen(
                                 EmptyHint("Aún no tienes favoritos.\nToca el ❤ en una canción para agregarla.")
                             } else {
                                 val onPlayFav = remember(favSongs) { fn@{ i: Int -> vm.play(favSongs, i) } }
-                                SongList(favSongs, state.currentSong?.id, favorites, state.isPlaying, onPlayFav, onToggleFavorite)
+                                SongList(favSongs, state.currentSong?.id, favorites, state.isPlaying, onPlayFav, onToggleFavorite, onAnadirALista = { guardando = it })
                             }
                         }
                     }
                 }
             }
+        }
+
+        guardando?.let { song ->
+            val scope = rememberCoroutineScope()
+            DialogoAnadirALista(
+                listas = listas,
+                onElegir = { lista ->
+                    val metidas = listasVm.anadir(lista.id, listOf(song.id))
+                    guardando = null
+                    scope.launch {
+                        snackbar.showSnackbar(
+                            if (metidas > 0) "Añadida a ${lista.nombre}"
+                            else "Ya estaba en ${lista.nombre}"
+                        )
+                    }
+                },
+                onCrear = { nombre ->
+                    listasVm.crear(nombre, listOf(song.id))
+                    guardando = null
+                    scope.launch { snackbar.showSnackbar("Lista \"$nombre\" creada") }
+                },
+                onCerrar = { guardando = null },
+            )
         }
 
         // ===== Panel Now Playing (se desliza sobre todo) =====
@@ -365,6 +413,7 @@ private fun SongList(
     isPlaying: Boolean,
     onPlay: (Int) -> Unit,
     onToggleFavorite: (String) -> Unit,
+    onAnadirALista: ((Song) -> Unit)? = null,
 ) {
     LazyColumn(contentPadding = PaddingValues(vertical = 8.dp)) {
         itemsIndexed(songs, key = { _, song -> song.id }) { index, song ->
@@ -375,6 +424,7 @@ private fun SongList(
                 onClick = { onPlay(index) },
                 onToggleFavorite = { onToggleFavorite(song.id) },
                 isPlaying = isPlaying,
+                onLongClick = onAnadirALista?.let { { it(song) } },
             )
         }
     }
@@ -601,3 +651,76 @@ private fun CenteredMessage(title: String, subtitle: String, buttonText: String,
     }
 }
 
+/**
+ * Las listas del usuario, con su portada.
+ *
+ * Crear una lleva directo a su pantalla: recién creada está vacía, y lo siguiente
+ * es ponerle portada y canciones.
+ */
+@Composable
+private fun PlaylistList(
+    listas: List<Playlist>,
+    onAbrir: (String) -> Unit,
+    onCrear: (String) -> Unit,
+) {
+    var creando by remember { mutableStateOf(false) }
+    LazyColumn(contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)) {
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth()
+                    .clickable { creando = true }
+                    .padding(vertical = 12.dp, horizontal = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(
+                    Modifier.size(52.dp).clip(RoundedCornerShape(12.dp))
+                        .background(MaterialTheme.colorScheme.primaryContainer),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        Icons.Rounded.Add,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    )
+                }
+                Spacer(Modifier.width(12.dp))
+                Text(
+                    "Crear lista",
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+            }
+        }
+        items(listas, key = { it.id }) { lista ->
+            Row(
+                modifier = Modifier.fillMaxWidth()
+                    .clickable { onAbrir(lista.id) }
+                    .padding(vertical = 12.dp, horizontal = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                PortadaDeLista(lista.portada, Modifier.size(52.dp))
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        lista.nombre, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Text(
+                        if (lista.canciones.size == 1) "1 canción"
+                        else "${lista.canciones.size} canciones",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+    }
+    if (creando) {
+        DialogoDeLista(
+            titulo = "Nueva lista",
+            onGuardar = { nombre, _ -> creando = false; onCrear(nombre) },
+            onCerrar = { creando = false },
+        )
+    }
+}
