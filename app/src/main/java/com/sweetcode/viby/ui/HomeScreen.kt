@@ -86,7 +86,6 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.sweetcode.viby.data.ArtistImages
 import com.sweetcode.viby.data.Artista
@@ -123,8 +122,8 @@ fun HomeScreen(
     onOpenAlbum: (String) -> Unit,
     onOpenArtist: (String) -> Unit,
     onOpenPlaylist: (String) -> Unit,
+    listasVm: PlaylistViewModel,
 ) {
-    val listasVm: PlaylistViewModel = viewModel()
     val listas by listasVm.listas.collectAsStateWithLifecycle()
     // Canción que se está guardando en una lista, si hay alguna.
     var guardando by remember { mutableStateOf<Song?>(null) }

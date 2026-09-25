@@ -10,5 +10,7 @@ data class Playlist(
     val portada: String? = null,
     /** Ids de canciones, en el orden en que se añadieron. */
     val canciones: List<String> = emptyList(),
+    /** Nombre del .m3u con el que se exportó, para poder rehacerlo o borrarlo. */
+    val m3u: String? = null,
     val creada: Long = System.currentTimeMillis(),
 )

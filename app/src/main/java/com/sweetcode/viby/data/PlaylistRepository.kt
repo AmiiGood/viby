@@ -41,6 +41,7 @@ class PlaylistRepository(private val context: Context) {
                             canciones = buildList {
                                 for (j in 0 until ids.length()) add(ids.getString(j))
                             },
+                            m3u = o.optString("m3u").takeIf { it.isNotBlank() },
                             creada = o.optLong("creada"),
                         )
                     )
@@ -60,6 +61,7 @@ class PlaylistRepository(private val context: Context) {
                         put("descripcion", p.descripcion)
                         put("portada", p.portada ?: "")
                         put("canciones", JSONArray(p.canciones))
+                        put("m3u", p.m3u ?: "")
                         put("creada", p.creada)
                     }
                 )

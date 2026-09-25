@@ -57,6 +57,10 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun VibyApp() {
     val vm: PlayerViewModel = viewModel()
+    // Se crea aquí y se pasa, no dentro de cada destino: `viewModel()` dentro de
+    // un composable de navegación da una instancia por entrada de la pila, y dos
+    // copias de las listas se pisaban entre ellas al guardar.
+    val listasVm: PlaylistViewModel = viewModel()
     val nav = rememberNavController()
 
     AvisoDeActualizacion()
@@ -79,6 +83,7 @@ private fun VibyApp() {
                 onOpenAlbum = { name -> nav.navigate("album/${Uri.encode(name)}") },
                 onOpenArtist = { clave -> nav.navigate("artist/${Uri.encode(clave)}") },
                 onOpenPlaylist = { id -> nav.navigate("playlist/$id") },
+                listasVm = listasVm,
             )
         }
         composable("equalizer") {
@@ -130,7 +135,6 @@ private fun VibyApp() {
         }
         composable("playlist/{id}") { entry ->
             val id = entry.arguments?.getString("id").orEmpty()
-            val listasVm: PlaylistViewModel = viewModel()
             val listas by listasVm.listas.collectAsStateWithLifecycle()
             val lista = listas.firstOrNull { it.id == id }
             if (lista == null) {
